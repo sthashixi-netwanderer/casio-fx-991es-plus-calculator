@@ -63,13 +63,13 @@
     - `func subtractMemory()`
     - `func recallMemory()`
 
-- [ ] **Step 1: Implement Tokenizer, Evaluator, and State Machine in `Sources/greeter/Calculator.swift`**
+- [x] **Step 1: Implement Tokenizer, Evaluator, and State Machine in `Sources/greeter/Calculator.swift`**
   - Implement infix tokenization (numbers, operators `+`, `−`, `×`, `÷`, `^`, functions `sin`, `cos`, `tan`, `sin⁻¹`, `cos⁻¹`, `tan⁻¹`, `log`, `ln`, `√`, `∛`, `x²`, `x⁻¹`, `!`, constants `π`, `e`, `Ans`, parentheses).
   - Implement Shunting-Yard algorithm and RPN evaluator respecting operator precedence and `AngleUnit`.
   - Implement number formatting respecting `DisplayFormat` (`Norm`, `Fix`, `Sci`).
   - Implement `MenuState` transitions for `MODE` and `SETUP`.
 
-- [ ] **Step 2: Verify `Calculator.swift` compiles cleanly with `xtool dev build`**
+- [x] **Step 2: Verify `Calculator.swift` compiles cleanly with `xtool dev build`**
   - Run: `xtool dev build`
   - Expected: Build complete! (0 errors)
 
@@ -90,10 +90,10 @@
       - Line 1: Expression string with blinking cursor indicator (`_`) or interactive menu options (`1:COMP 2:STAT...`).
       - Line 2: Large monospaced digit result, right-aligned, or `Math ERROR` with `[AC]:Cancel`.
 
-- [ ] **Step 1: Implement `CasioLCDView` in `Sources/greeter/ContentView.swift`**
+- [x] **Step 1: Implement `CasioLCDView` in `Sources/greeter/ContentView.swift`**
   - Create the dual-line Casio LCD styling with authentic bezel, annunciator status row, and menu screen rendering.
 
-- [ ] **Step 2: Verify `ContentView.swift` compiles with `xtool dev build`**
+- [x] **Step 2: Verify `ContentView.swift` compiles with `xtool dev build`**
   - Run: `xtool dev build`
   - Expected: Build complete!
 
@@ -115,11 +115,11 @@
     - Function rows: `■/□`, `√`, `x²`, `x^■`, `log`, `ln`, `(-)`, `° ' "`, `hyp`, `sin`, `cos`, `tan`, `RCL`, `ENG`, `(`, `)`, `S<=>D`, `M+`.
     - Numeric pad: `7`, `8`, `9`, lime green `DEL`, lime green `AC`, `4`, `5`, `6`, `×`, `÷`, `1`, `2`, `3`, `+`, `−`, `0`, `.`, `×10^x`, `Ans`, `=`.
 
-- [ ] **Step 1: Implement full Casio hardware chassis and keypad in `Sources/greeter/ContentView.swift`**
+- [x] **Step 1: Implement full Casio hardware chassis and keypad in `Sources/greeter/ContentView.swift`**
   - Build the contoured outer shell, solar cell header, D-pad, and 5-tier keypad with Casio button styling and color coding.
   - Wire all button taps to `engine.handleKey(...)`.
 
-- [ ] **Step 2: Verify build and layout with `xtool dev build`**
+- [x] **Step 2: Verify build and layout with `xtool dev build`**
   - Run: `xtool dev build`
   - Expected: Build complete!
 
@@ -130,11 +130,11 @@
 **Files:**
 - Test / Verification via: `xtool dev build` and engine unit validation
 
-- [ ] **Step 1: Run `xtool dev build`**
+- [x] **Step 1: Run `xtool dev build`**
   - Run: `xtool dev build`
   - Expected: Exit code 0, binary output in `xtool/greeter.app`.
 
-- [ ] **Step 2: Inspect code for review focus items**
+- [x] **Step 2: Inspect code for review focus items**
   - Verify division by zero yields `Math ERROR`.
   - Verify angle conversions for $\sin(30^\circ)$, $\sin(\pi/6\text{ rad})$, $\sin(50\text{ gra})$.
   - Verify `SHIFT` + `MODE` opens `SETUP` menu and correctly sets `Deg`, `Rad`, `Gra`, `Fix`, `Sci`, `Norm`.
