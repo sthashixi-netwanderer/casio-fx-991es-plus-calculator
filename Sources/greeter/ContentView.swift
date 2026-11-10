@@ -5,30 +5,120 @@ import UIKit
 
 // MARK: - Visual Tokens (Casio fx-991ES PLUS 2nd Edition)
 
-private enum CasioTheme {
-    // Housing / Chassis
-    static let chassis = Color(red: 0.10, green: 0.11, blue: 0.12)
-    static let chassisBezel = Color(red: 0.15, green: 0.16, blue: 0.17)
-    static let solarCell = Color(red: 0.22, green: 0.15, blue: 0.13)
-    static let solarGrid = Color.white.opacity(0.12)
+enum CasioTheme {
+    // Housing / Chassis (sampled from fx-991ES PLUS 2nd edition: dark matte slate)
+    static let chassis = Color(red: 0.12, green: 0.13, blue: 0.15)
+    static let chassisBezel = Color(red: 0.18, green: 0.19, blue: 0.22)
+    static let solarCell = Color(red: 0.24, green: 0.14, blue: 0.12)
+    static let solarGrid = Color.white.opacity(0.14)
 
-    // LCD Display
-    static let lcdBackground = Color(red: 0.54, green: 0.61, blue: 0.49)
-    static let lcdBezel = Color(red: 0.08, green: 0.09, blue: 0.10)
-    static let lcdTextActive = Color(red: 0.10, green: 0.14, blue: 0.10)
-    static let lcdTextDim = Color(red: 0.10, green: 0.14, blue: 0.10).opacity(0.18)
+    // LCD Display (sampled from photo: crisp light greenish LCD glass)
+    static let lcdBackground = Color(red: 0.845, green: 0.916, blue: 0.855)
+    static let lcdBackgroundOff = Color(red: 0.22, green: 0.25, blue: 0.22)
+    static let lcdBezel = Color(red: 0.08, green: 0.09, blue: 0.11)
+    static let lcdTextActive = Color(red: 0.07, green: 0.09, blue: 0.13)
+    static let lcdTextDim = Color(red: 0.07, green: 0.09, blue: 0.13).opacity(0.16)
 
     // Key Fills
-    static let keyStandard = Color(red: 0.18, green: 0.19, blue: 0.20)
-    static let keyStandardBevel = Color.white.opacity(0.08)
-    static let keyDelAc = Color(red: 0.44, green: 0.66, blue: 0.22)
-    static let keyReplay = Color(red: 0.45, green: 0.47, blue: 0.50)
+    static let keyStandard = Color(red: 0.18, green: 0.19, blue: 0.21)
+    static let keyStandardBevel = Color.white.opacity(0.10)
+    static let keyDelAc = Color(red: 0.53, green: 0.72, blue: 0.35) // Authentic Casio Lime Green
+    static let keyDelAcInk = Color(red: 0.05, green: 0.16, blue: 0.04) // Dark text for DEL and AC
+    static let keyReplay = Color(red: 0.38, green: 0.41, blue: 0.45)
+    static let keyEquals = Color(red: 0.22, green: 0.24, blue: 0.27)
 
     // Secondary / Modifier Inks
-    static let inkShift = Color(red: 0.98, green: 0.78, blue: 0.18) // Bright Yellow
-    static let inkAlpha = Color(red: 0.92, green: 0.28, blue: 0.42) // Magenta/Red
+    static let inkShift = Color(red: 0.98, green: 0.82, blue: 0.22) // Yellow Gold
+    static let inkAlpha = Color(red: 0.88, green: 0.32, blue: 0.44) // Magenta / Red
     static let inkWhite = Color.white
-    static let inkSilver = Color(red: 0.75, green: 0.77, blue: 0.80)
+    static let inkSilver = Color(red: 0.76, green: 0.78, blue: 0.82)
+    static let inkBlue = Color(red: 0.28, green: 0.65, blue: 0.90) // Base-N blue labels
+}
+
+// MARK: - Key Glyphs & Faces
+
+struct IntegrationKeyFace: View {
+    var body: some View {
+        HStack(spacing: 2) {
+            Text("∫")
+                .font(.system(size: 15, weight: .light, design: .serif))
+                .italic()
+                .offset(y: -0.5)
+
+            // Integrand template box
+            RoundedRectangle(cornerRadius: 1.5)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1.2)
+                .frame(width: 8, height: 9)
+
+            Text("dx")
+                .font(.system(size: 11, weight: .medium, design: .serif))
+                .italic()
+        }
+        .foregroundColor(CasioTheme.inkWhite)
+    }
+}
+
+struct FractionKeyFace: View {
+    var body: some View {
+        VStack(spacing: 1.5) {
+            RoundedRectangle(cornerRadius: 1)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                .frame(width: 8, height: 6)
+            Rectangle()
+                .fill(Color.white.opacity(0.92))
+                .frame(width: 10, height: 1)
+            RoundedRectangle(cornerRadius: 1)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                .frame(width: 8, height: 6)
+        }
+        .foregroundColor(CasioTheme.inkWhite)
+    }
+}
+
+struct SqrtKeyFace: View {
+    var body: some View {
+        HStack(spacing: 1.5) {
+            Text("√")
+                .font(.system(size: 13, weight: .regular))
+            RoundedRectangle(cornerRadius: 1)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                .frame(width: 7, height: 7)
+        }
+        .foregroundColor(CasioTheme.inkWhite)
+    }
+}
+
+struct PowerKeyFace: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 1) {
+            Text("x")
+                .font(.system(size: 12, weight: .semibold, design: .serif))
+                .italic()
+            RoundedRectangle(cornerRadius: 1)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                .frame(width: 6, height: 6)
+                .offset(y: -3)
+        }
+        .foregroundColor(CasioTheme.inkWhite)
+    }
+}
+
+struct LogBaseKeyFace: View {
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 1.5) {
+            Text("log")
+                .font(.system(size: 10, weight: .semibold))
+            RoundedRectangle(cornerRadius: 1)
+                .stroke(Color.white.opacity(0.92), lineWidth: 0.9)
+                .frame(width: 5.5, height: 5.5)
+                .offset(y: 2)
+            RoundedRectangle(cornerRadius: 1)
+                .stroke(Color.white.opacity(0.92), lineWidth: 0.9)
+                .frame(width: 6.5, height: 8)
+                .offset(y: -1)
+        }
+        .foregroundColor(CasioTheme.inkWhite)
+    }
 }
 
 // MARK: - Haptics
@@ -49,17 +139,31 @@ private enum CasioHaptics {
     #endif
 }
 
-// MARK: - Content View
+// MARK: - Main Calculator View
 
 struct ContentView: View {
     @StateObject private var engine = CalculatorEngine()
+    @State private var codeBuffer: String = ""
+    @State private var waitingForSto: Bool = false
+    @State private var tableScrollIndex: Int = 0
+
+    private var isPromptActive: Bool {
+        switch engine.menuState {
+        case .eqnCoeffPrompt, .calcPrompt, .solvePrompt:
+            return true
+        case .tablePrompt(let step) where step > 0 && step < 4:
+            return true
+        default:
+            return false
+        }
+    }
 
     var body: some View {
         ZStack {
             CasioTheme.chassis
                 .ignoresSafeArea()
 
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 // Header (Branding & Solar Cell)
                 casioHeader
                     .padding(.horizontal, 16)
@@ -69,12 +173,12 @@ struct ContentView: View {
                 casioScreen
                     .padding(.horizontal, 14)
 
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
 
                 // Keypad Matrix
                 casioKeypad
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 6)
             }
             .frame(maxWidth: 440)
         }
@@ -153,44 +257,51 @@ struct ContentView: View {
 
             // Inner LCD
             RoundedRectangle(cornerRadius: 6)
-                .fill(CasioTheme.lcdBackground)
+                .fill(engine.isOff ? CasioTheme.lcdBackgroundOff : CasioTheme.lcdBackground)
                 .padding(6)
                 .overlay(
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Annunciator Status Bar
-                        annunciatorBar
+                    Group {
+                        if !engine.isOff {
+                            VStack(alignment: .leading, spacing: 3) {
+                                // Annunciator Status Bar
+                                annunciatorBar
 
-                        // LCD Content (Menu or Expression/Result)
-                        if engine.menuState != .none {
-                            menuDisplayView
-                        } else {
-                            expressionDisplayView
+                                // LCD Content (Menu or Expression/Result)
+                                if engine.menuState != .none {
+                                    menuDisplayView
+                                } else {
+                                    expressionDisplayView
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
                 )
         }
-        .frame(height: 122)
+        .frame(height: 124)
     }
 
     // MARK: - Annunciator Bar
 
     private var annunciatorBar: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 6) {
             annunciator("S", active: engine.shiftActive)
             annunciator("A", active: engine.alphaActive)
             annunciator("M", active: engine.hasMemory)
-            annunciator("STO", active: engine.shiftActive)
+            annunciator("STO", active: waitingForSto)
             Spacer()
+            annunciator("CMPLX", active: engine.activeMode == .cmplx)
+            annunciator("STAT", active: engine.activeMode == .stat)
+            annunciator(engine.baseNType.rawValue, active: engine.activeMode == .baseN)
             annunciator("D", active: engine.angleUnit == .deg)
             annunciator("R", active: engine.angleUnit == .rad)
             annunciator("G", active: engine.angleUnit == .gra)
             annunciator("Fix", active: isFixFormat)
             annunciator("Sci", active: isSciFormat)
             annunciator("Math", active: true)
-            annunciator("▲", active: false)
-            annunciator("▼", active: false)
+            annunciator("▲", active: !engine.history.isEmpty)
+            annunciator("▼", active: engine.historyIndex >= 0)
         }
         .frame(height: 12)
     }
@@ -217,8 +328,13 @@ struct ContentView: View {
         VStack(spacing: 2) {
             // Expression Line (Top, Left-aligned, with Cursor)
             HStack(spacing: 0) {
+                if engine.activeMode == .baseN {
+                    Text("\(engine.baseNType.rawValue) ")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                }
                 Text(renderedExpression)
-                    .font(.system(size: 17, weight: .medium, design: .monospaced))
+                    .font(.system(size: 16, weight: .medium, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
                     .lineLimit(1)
                 Spacer()
@@ -231,7 +347,7 @@ struct ContentView: View {
             HStack {
                 if engine.isError {
                     Text(engine.result)
-                        .font(.system(size: 20, weight: .heavy, design: .monospaced))
+                        .font(.system(size: 19, weight: .heavy, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                     Spacer()
                     Text("[AC]:Cancel")
@@ -240,13 +356,13 @@ struct ContentView: View {
                 } else {
                     Spacer()
                     Text(engine.result)
-                        .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 30, weight: .semibold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                         .lineLimit(1)
                         .minimumScaleFactor(0.3)
                 }
             }
-            .frame(height: 40)
+            .frame(height: 38)
         }
     }
 
@@ -266,26 +382,38 @@ struct ContentView: View {
     // MARK: - Menu Display View
 
     private var menuDisplayView: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             switch engine.menuState {
             case .modeMenu:
-                Text("1:COMP    2:STAT")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                Text("1:COMP    2:CMPLX   3:STAT")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
-                Text("3:TABLE   4:EQN")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                Text("4:BASE-N  5:EQN     6:MATRIX")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("7:TABLE   8:VECTOR")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
-            case .setupMenu:
-                Text("1:MthIO 2:LineIO 3:Deg")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(CasioTheme.lcdTextActive)
-                Text("4:Rad   5:Gra    6:Fix")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(CasioTheme.lcdTextActive)
-                Text("7:Sci   8:Norm")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(CasioTheme.lcdTextActive)
+            case .setupMenu(let page):
+                if page == 1 {
+                    Text("1:MthIO 2:LineIO 3:Deg 4:Rad")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("5:Gra   6:Fix    7:Sci 8:Norm")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("▼ Next Page")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                } else {
+                    Text("1:ab/c 2:d/c 3:CMPLX 4:STAT")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("5:Disp")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                }
 
             case .fixPrompt:
                 Text("Fix 0 ~ 9 ?")
@@ -297,7 +425,167 @@ struct ContentView: View {
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
-            case .none:
+            case .clrPrompt:
+                Text("Reset: 1:Setup 2:Memory 3:All")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("[AC]:Cancel  [=]:OK")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .constPrompt:
+                Text("CONST 01 ~ 40 ? [\(codeBuffer)]")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .convPrompt:
+                Text("CONV 01 ~ 40 ? [\(codeBuffer)]")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .statTypeMenu:
+                Text("1:1-VAR  2:A+BX  3:_+CX²")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("4:ln X   5:e^X   6:A·B^X")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("7:A·X^B  8:1/X")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .cmplxMenu:
+                Text("1:arg    2:Abs    3:Conjg")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("4:▶r∠θ   5:▶a+bi")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .eqnTypeMenu:
+                Text("1:anX+bnY=cn 2:anX+bnY+cnZ=dn")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("3:aX²+bX+c=0 4:aX³+bX²+cX+d=0")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .matrixMenu:
+                Text("1:Dim  2:Data 3:MatA 4:MatB")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("5:MatC 6:MatAns 7:det 8:Trn")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .vectorMenu:
+                Text("1:Dim  2:Data 3:VctA 4:VctB")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("5:VctC 6:VctAns 7:Dot")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .mthIOMenu:
+                Text("1:MathO    2:LineO")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .authenticityView:
+                Text("ID: 991ES-2ND-042517EE37E0")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("wes.casio.com/calc/")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("[AC]:Return")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .eqnCoeffPrompt(let type, let name, let idx):
+                Text("EQN \(type) [Coeff \(idx + 1)]")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("\(name) = \(codeBuffer.isEmpty ? "0" : codeBuffer)_")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .eqnSolutionView(let solutions, let index):
+                Text("EQN Solution (\(index + 1)/\(solutions.count))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text(solutions[index])
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .tablePrompt(let step):
+                if step == 0 {
+                    Text("f(X) =")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("\(engine.expression)_")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                } else if step == 1 {
+                    Text("Start?")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("\(codeBuffer.isEmpty ? "\(engine.tableStartVal)" : codeBuffer)_")
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                } else if step == 2 {
+                    Text("End?")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("\(codeBuffer.isEmpty ? "\(engine.tableEndVal)" : codeBuffer)_")
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                } else if step == 3 {
+                    Text("Step?")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("\(codeBuffer.isEmpty ? "\(engine.tableStepVal)" : codeBuffer)_")
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                } else {
+                    let safeIdx = min(max(0, tableScrollIndex), max(0, engine.tableRows.count - 1))
+                    let row = engine.tableRows.isEmpty ? (x: 0.0, fx: 0.0) : engine.tableRows[safeIdx]
+                    Text("Row \(safeIdx + 1)/\(engine.tableRows.count)")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("X=\(CasioEvaluator.format(row.x, format: engine.displayFormat))")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("f(X)=\(CasioEvaluator.format(row.fx, format: engine.displayFormat))")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                }
+
+            case .calcPrompt(let varName, _):
+                Text("\(String(varName))?")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("\(codeBuffer.isEmpty ? "\(engine.variables[varName] ?? 0)" : codeBuffer)_")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .solvePrompt(let guess):
+                Text("Solve for X")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("X? \(codeBuffer.isEmpty ? "\(guess)" : codeBuffer)_")
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .solveResult(let root, let residual):
+                Text("X = \(CasioEvaluator.format(root, format: engine.displayFormat))")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("L - R = \(CasioEvaluator.format(residual, format: engine.displayFormat))")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            default:
                 EmptyView()
             }
         }
@@ -308,59 +596,114 @@ struct ContentView: View {
 
     private var casioKeypad: some View {
         VStack(spacing: 6) {
-            // Control Tier (SHIFT, ALPHA, Replay D-Pad, MODE, ON)
-            controlTier
-                .padding(.bottom, 2)
+            // Upper Tier: SHIFT, ALPHA, CALC, ∫dx, REPLAY D-PAD, MODE, ON, x⁻¹, log_■ ■
+            upperTier
 
-            // Scientific Function Grid (3 Rows)
-            scientificTier
+            // Scientific Function Grid (3 Rows × 6 Keys)
+            functionGrid
 
-            // Main Numeric & Operator Pad (4 Rows)
+            // Main Numeric & Operator Pad (4 Rows × 5 Keys)
             mainNumberPad
         }
     }
 
-    // MARK: - Control Tier
+    // MARK: - Upper Control & Wing Tier
 
-    private var controlTier: some View {
-        HStack(spacing: 12) {
-            // Left: SHIFT and ALPHA
-            VStack(spacing: 5) {
-                casioButton(label: "SHIFT", shiftLabel: "", alphaLabel: "", ink: CasioTheme.inkShift, height: 26) {
-                    CasioHaptics.tap()
-                    engine.toggleShift()
+    private var upperTier: some View {
+        HStack(alignment: .top, spacing: 6) {
+            // Left Wing (flanking D-Pad)
+            VStack(spacing: 3) {
+                // Round metallic buttons: SHIFT & ALPHA
+                HStack(spacing: 8) {
+                    metallicCircleButton(title: "SHIFT", titleColor: CasioTheme.inkShift) {
+                        CasioHaptics.tap()
+                        engine.toggleShift()
+                    }
+                    metallicCircleButton(title: "ALPHA", titleColor: CasioTheme.inkAlpha) {
+                        CasioHaptics.tap()
+                        engine.toggleAlpha()
+                    }
                 }
-                casioButton(label: "ALPHA", shiftLabel: "", alphaLabel: "", ink: CasioTheme.inkAlpha, height: 26) {
-                    CasioHaptics.tap()
-                    engine.toggleAlpha()
+                .frame(maxWidth: .infinity)
+
+                // CALC key
+                wingButton(shift: "SOLVE", alpha: "=", label: "CALC") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.startSolve()
+                    } else if engine.alphaActive {
+                        engine.alphaActive = false
+                        engine.insert("=")
+                    } else {
+                        engine.startCalc()
+                    }
+                }
+
+                // THE INTEGRATION KEY: ∫ □ dx
+                wingButtonCustom(shift: "d/dx", alpha: ":") {
+                    IntegrationKeyFace()
+                } action: {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("d/dx(")
+                    } else if engine.alphaActive {
+                        engine.alphaActive = false
+                        engine.insert(":")
+                    } else {
+                        engine.insert("∫(")
+                    }
                 }
             }
-            .frame(width: 60)
-
-            Spacer()
+            .frame(maxWidth: .infinity)
 
             // Center: Replay D-Pad
             replayPad
+                .frame(width: 86, height: 86)
+                .padding(.top, 2)
 
-            Spacer()
-
-            // Right: MODE SETUP and ON
-            VStack(spacing: 5) {
-                casioButton(label: "MODE", shiftLabel: "SETUP", alphaLabel: "", height: 26) {
-                    CasioHaptics.tap()
-                    if engine.shiftActive {
-                        engine.shiftActive = false
-                        engine.openSetupMenu()
-                    } else {
-                        engine.openModeMenu()
+            // Right Wing (flanking D-Pad)
+            VStack(spacing: 3) {
+                // Round metallic buttons: MODE SETUP & ON
+                HStack(spacing: 8) {
+                    metallicCircleButton(title: "MODE", shiftTitle: "SETUP", titleColor: .white, shiftColor: CasioTheme.inkShift) {
+                        CasioHaptics.tap()
+                        if engine.shiftActive {
+                            engine.shiftActive = false
+                            engine.openSetupMenu()
+                        } else {
+                            engine.openModeMenu()
+                        }
+                    }
+                    metallicCircleButton(title: "ON", titleColor: .white) {
+                        CasioHaptics.firm()
+                        engine.turnOn()
                     }
                 }
-                casioButton(label: "ON", shiftLabel: "", alphaLabel: "", height: 26) {
-                    CasioHaptics.firm()
-                    engine.turnOn()
+                .frame(maxWidth: .infinity)
+
+                // x⁻¹ key
+                wingButton(shift: "x!", alpha: "", label: "x⁻¹") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("!")
+                    } else {
+                        engine.insert("^(-1)")
+                    }
+                }
+
+                // log_■ ■ key
+                wingButtonCustom(shift: "Σ", alpha: "") {
+                    LogBaseKeyFace()
+                } action: {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("Σ(")
+                    } else {
+                        engine.insert("log(")
+                    }
                 }
             }
-            .frame(width: 60)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -368,56 +711,77 @@ struct ContentView: View {
 
     private var replayPad: some View {
         ZStack {
+            // Outer Bezel Rim
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(white: 0.16), Color(white: 0.09)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 86, height: 86)
+                .overlay(
+                    Circle().stroke(CasioTheme.chassisBezel, lineWidth: 1.5)
+                )
+
+            // Inner Rocker Disc
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [CasioTheme.keyReplay.opacity(0.9), CasioTheme.chassisBezel],
+                        colors: [CasioTheme.keyReplay, Color(red: 0.22, green: 0.24, blue: 0.27)],
                         center: .center,
-                        startRadius: 4,
+                        startRadius: 6,
                         endRadius: 42
                     )
                 )
-                .frame(width: 82, height: 82)
-                .overlay(
-                    Circle().stroke(CasioTheme.chassisBezel, lineWidth: 2)
-                )
+                .frame(width: 80, height: 80)
+                .shadow(color: .black.opacity(0.35), radius: 2, x: 0, y: 1)
 
+            // Tactile dot grips at the diagonals
+            ForEach([45.0, 135.0, 225.0, 315.0], id: \.self) { angle in
+                tactileDotCluster
+                    .rotationEffect(.degrees(angle))
+            }
+
+            // Center Branding
             Text("REPLAY")
-                .font(.system(size: 8, weight: .bold, design: .default))
-                .foregroundColor(CasioTheme.inkWhite.opacity(0.6))
+                .font(.system(size: 7, weight: .bold, design: .default))
+                .foregroundColor(CasioTheme.inkSilver)
 
-            // Directional Buttons
+            // Up & Down Buttons
             VStack {
                 Button {
                     CasioHaptics.tap()
+                    handleReplayUp()
                 } label: {
-                    Image(systemName: "triangle.fill")
+                    Image(systemName: "arrowtriangle.up.fill")
                         .font(.system(size: 8))
-                        .foregroundColor(CasioTheme.inkWhite)
+                        .foregroundColor(CasioTheme.inkSilver)
                         .frame(width: 32, height: 22)
                 }
                 Spacer()
                 Button {
                     CasioHaptics.tap()
+                    handleReplayDown()
                 } label: {
-                    Image(systemName: "triangle.fill")
-                        .rotationEffect(.degrees(180))
+                    Image(systemName: "arrowtriangle.down.fill")
                         .font(.system(size: 8))
-                        .foregroundColor(CasioTheme.inkWhite)
+                        .foregroundColor(CasioTheme.inkSilver)
                         .frame(width: 32, height: 22)
                 }
             }
-            .frame(height: 78)
+            .frame(height: 74)
 
+            // Left & Right Buttons
             HStack {
                 Button {
                     CasioHaptics.tap()
                     engine.moveCursorLeft()
                 } label: {
-                    Image(systemName: "triangle.fill")
-                        .rotationEffect(.degrees(-90))
+                    Image(systemName: "arrowtriangle.left.fill")
                         .font(.system(size: 8))
-                        .foregroundColor(CasioTheme.inkWhite)
+                        .foregroundColor(CasioTheme.inkSilver)
                         .frame(width: 22, height: 32)
                 }
                 Spacer()
@@ -425,27 +789,72 @@ struct ContentView: View {
                     CasioHaptics.tap()
                     engine.moveCursorRight()
                 } label: {
-                    Image(systemName: "triangle.fill")
-                        .rotationEffect(.degrees(90))
+                    Image(systemName: "arrowtriangle.right.fill")
                         .font(.system(size: 8))
-                        .foregroundColor(CasioTheme.inkWhite)
+                        .foregroundColor(CasioTheme.inkSilver)
                         .frame(width: 22, height: 32)
                 }
             }
-            .frame(width: 78)
+            .frame(width: 74)
         }
     }
 
-    // MARK: - Scientific Function Grid
+    private var tactileDotCluster: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 2) {
+                Circle().fill(Color.white.opacity(0.20)).frame(width: 1.8, height: 1.8)
+                Circle().fill(Color.white.opacity(0.20)).frame(width: 1.8, height: 1.8)
+            }
+            HStack(spacing: 2) {
+                Circle().fill(Color.white.opacity(0.20)).frame(width: 1.8, height: 1.8)
+                Circle().fill(Color.white.opacity(0.20)).frame(width: 1.8, height: 1.8)
+            }
+        }
+        .offset(y: -28)
+    }
 
-    private var scientificTier: some View {
-        VStack(spacing: 5) {
-            // Function Row 1
-            HStack(spacing: 6) {
-                funcKey("■/□", shift: "∛", alpha: "") {
+    private func handleReplayUp() {
+        if case .eqnSolutionView(let solutions, let index) = engine.menuState {
+            let prev = max(0, index - 1)
+            engine.menuState = .eqnSolutionView(solutions: solutions, index: prev)
+        } else if case .tablePrompt(let step) = engine.menuState, step == 4 {
+            if !engine.tableRows.isEmpty && tableScrollIndex > 0 {
+                tableScrollIndex -= 1
+            }
+        } else {
+            engine.moveHistoryUp()
+        }
+    }
+
+    private func handleReplayDown() {
+        if case .eqnSolutionView(let solutions, let index) = engine.menuState {
+            let next = min(solutions.count - 1, index + 1)
+            engine.menuState = .eqnSolutionView(solutions: solutions, index: next)
+        } else if case .tablePrompt(let step) = engine.menuState, step == 4 {
+            if !engine.tableRows.isEmpty && tableScrollIndex < engine.tableRows.count - 1 {
+                tableScrollIndex += 1
+            }
+        } else if case .setupMenu(let page) = engine.menuState {
+            engine.openSetupMenu(page: page == 1 ? 2 : 1)
+        } else {
+            engine.moveHistoryDown()
+        }
+    }
+
+    // MARK: - Lower Scientific Function Grid (3 Rows × 6 Keys)
+
+    private var functionGrid: some View {
+        VStack(spacing: 4) {
+            // Row 1: ■/□, √□, x², x^■, log, ln
+            HStack(spacing: 4) {
+                funcKeyCustom(shift: "a b/c", alpha: "") {
+                    FractionKeyFace()
+                } action: {
                     engine.insert("÷")
                 }
-                funcKey("√", shift: "∛", alpha: "") {
+                funcKeyCustom(shift: "∛", alpha: "") {
+                    SqrtKeyFace()
+                } action: {
                     if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("∛(")
@@ -453,27 +862,42 @@ struct ContentView: View {
                         engine.insert("√(")
                     }
                 }
-                funcKey("x²", shift: "x³", alpha: "") {
-                    if engine.shiftActive {
+                funcKey("x²", shift: "x³", alpha: "DEC") {
+                    if engine.activeMode == .baseN {
+                        engine.setBaseN(.dec)
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("³")
                     } else {
                         engine.insert("²")
                     }
                 }
-                funcKey("x^■", shift: "ʸ√x", alpha: "") {
-                    engine.insert("^(")
+                funcKeyCustom(shift: "ˣ√", alpha: "HEX") {
+                    PowerKeyFace()
+                } action: {
+                    if engine.activeMode == .baseN {
+                        engine.setBaseN(.hex)
+                    } else if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("^(1÷")
+                    } else {
+                        engine.insert("^(")
+                    }
                 }
-                funcKey("log", shift: "10^■", alpha: "") {
-                    if engine.shiftActive {
+                funcKey("log", shift: "10^■", alpha: "BIN") {
+                    if engine.activeMode == .baseN {
+                        engine.setBaseN(.bin)
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("10^(")
                     } else {
                         engine.insert("log(")
                     }
                 }
-                funcKey("ln", shift: "e^■", alpha: "") {
-                    if engine.shiftActive {
+                funcKey("ln", shift: "e^■", alpha: "OCT") {
+                    if engine.activeMode == .baseN {
+                        engine.setBaseN(.oct)
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("e^(")
                     } else {
@@ -482,21 +906,48 @@ struct ContentView: View {
                 }
             }
 
-            // Function Row 2
-            HStack(spacing: 6) {
-                funcKey("(-)", shift: "", alpha: "A") {
-                    if engine.alphaActive { engine.alphaActive = false }
-                    engine.insert("-")
+            // Row 2: (-), ° ' ", hyp, sin, cos, tan
+            HStack(spacing: 4) {
+                funcKey("(-)", shift: "∠", alpha: "A") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("∠")
+                    } else if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("A")
+                    } else if isPromptActive {
+                        codeBuffer.append("-")
+                    } else {
+                        engine.insert("-")
+                    }
                 }
-                funcKey("° ' \"", shift: "←", alpha: "B") {
-                    if engine.alphaActive { engine.alphaActive = false }
-                    engine.insert("°")
+                funcKey("° ' \"", shift: "FACT", alpha: "B") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.primeFactorize()
+                    } else if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("B")
+                    } else {
+                        engine.convertToDMS()
+                    }
                 }
-                funcKey("hyp", shift: "", alpha: "C") {
-                    if engine.alphaActive { engine.alphaActive = false }
+                funcKey("hyp", shift: "Abs", alpha: "C") {
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("C")
+                    } else if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("abs(")
+                    } else {
+                        engine.insert("sinh(")
+                    }
                 }
                 funcKey("sin", shift: "sin⁻¹", alpha: "D") {
-                    if engine.shiftActive {
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("D")
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("sin⁻¹(")
                     } else {
@@ -504,7 +955,10 @@ struct ContentView: View {
                     }
                 }
                 funcKey("cos", shift: "cos⁻¹", alpha: "E") {
-                    if engine.shiftActive {
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("E")
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("cos⁻¹(")
                     } else {
@@ -512,7 +966,10 @@ struct ContentView: View {
                     }
                 }
                 funcKey("tan", shift: "tan⁻¹", alpha: "F") {
-                    if engine.shiftActive {
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("F")
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("tan⁻¹(")
                     } else {
@@ -521,21 +978,32 @@ struct ContentView: View {
                 }
             }
 
-            // Function Row 3
-            HStack(spacing: 6) {
+            // Row 3: RCL, ENG, (, ), S<=>D, M+
+            HStack(spacing: 4) {
                 funcKey("RCL", shift: "STO", alpha: "") {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.storeMemory()
+                        waitingForSto = true
                     } else {
-                        engine.recallMemory()
+                        engine.insert("A")
                     }
                 }
-                funcKey("ENG", shift: "←", alpha: "") {
-                    engine.cycleEng()
+                funcKey("ENG", shift: "←", alpha: "i") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.cycleEng()
+                    } else if engine.alphaActive || engine.activeMode == .cmplx {
+                        engine.alphaActive = false
+                        engine.insert("i")
+                    } else {
+                        engine.cycleEng()
+                    }
                 }
                 funcKey("(", shift: "%", alpha: "X") {
-                    if engine.shiftActive {
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("X")
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("%")
                     } else {
@@ -543,13 +1011,24 @@ struct ContentView: View {
                     }
                 }
                 funcKey(")", shift: ",", alpha: "Y") {
-                    engine.insert(")")
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("Y")
+                    } else if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert(",")
+                    } else {
+                        engine.insert(")")
+                    }
                 }
-                funcKey("S<=>D", shift: "a b/c", alpha: "") {
+                funcKey("S⇔D", shift: "a b/c ⇔ d/c", alpha: "") {
                     engine.toggleSD()
                 }
                 funcKey("M+", shift: "M-", alpha: "M") {
-                    if engine.shiftActive {
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("M")
+                    } else if engine.shiftActive {
                         engine.shiftActive = false
                         engine.subtractMemory()
                     } else {
@@ -560,34 +1039,67 @@ struct ContentView: View {
         }
     }
 
-    private func funcKey(_ label: String, shift: String, alpha: String, action: @escaping () -> Void) -> some View {
-        casioButton(label: label, shiftLabel: shift, alphaLabel: alpha, height: 29) {
-            CasioHaptics.tap()
-            action()
+    private func handleVariableKey(_ varName: Character) {
+        if waitingForSto {
+            waitingForSto = false
+            engine.storeToVariable(varName)
+        } else {
+            engine.insert(String(varName))
         }
     }
 
-    // MARK: - Main Number Pad
+    // MARK: - Main Number Pad (4 Rows × 5 Keys)
 
     private var mainNumberPad: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             // Row 1: 7, 8, 9, DEL, AC
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 digitKey("7", shift: "CONST")
                 digitKey("8", shift: "CONV")
                 digitKey("9", shift: "CLR")
-                casioButton(label: "DEL", shiftLabel: "INS", alphaLabel: "", fill: CasioTheme.keyDelAc, height: 36) {
+                casioButton(
+                    label: "DEL",
+                    shiftLabel: "INS",
+                    alphaLabel: "",
+                    fill: CasioTheme.keyDelAc,
+                    ink: CasioTheme.keyDelAcInk,
+                    labelFont: .system(size: 14, weight: .bold),
+                    height: 35
+                ) {
                     CasioHaptics.tap()
-                    engine.delete()
+                    if !codeBuffer.isEmpty {
+                        codeBuffer.removeLast()
+                    } else {
+                        engine.delete()
+                    }
                 }
-                casioButton(label: "AC", shiftLabel: "OFF", alphaLabel: "", fill: CasioTheme.keyDelAc, height: 36) {
+                casioButton(
+                    label: "AC",
+                    shiftLabel: "OFF",
+                    alphaLabel: "",
+                    fill: CasioTheme.keyDelAc,
+                    ink: CasioTheme.keyDelAcInk,
+                    labelFont: .system(size: 14, weight: .bold),
+                    height: 35
+                ) {
                     CasioHaptics.firm()
-                    engine.clearAll()
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.turnOff()
+                    } else if engine.menuState != .none {
+                        engine.menuState = .none
+                        codeBuffer = ""
+                        waitingForSto = false
+                    } else {
+                        engine.clearAll()
+                        codeBuffer = ""
+                        waitingForSto = false
+                    }
                 }
             }
 
             // Row 2: 4, 5, 6, ×, ÷
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 digitKey("4", shift: "MATRIX")
                 digitKey("5", shift: "VECTOR")
                 digitKey("6", shift: "")
@@ -596,7 +1108,7 @@ struct ContentView: View {
             }
 
             // Row 3: 1, 2, 3, +, −
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 digitKey("1", shift: "STAT")
                 digitKey("2", shift: "CMPLX")
                 digitKey("3", shift: "BASE")
@@ -604,11 +1116,11 @@ struct ContentView: View {
                 opKey("−", shift: "Rec")
             }
 
-            // Row 4: 0, ., ×10^x, Ans, =
-            HStack(spacing: 6) {
+            // Row 4: 0, ., ×10ˣ, Ans, =
+            HStack(spacing: 5) {
                 digitKey("0", shift: "Rnd")
                 digitKey(".", shift: "Ran#", alpha: "RanInt")
-                casioButton(label: "×10^x", shiftLabel: "π", alphaLabel: "e", height: 36) {
+                casioButton(label: "×10ˣ", shiftLabel: "π", alphaLabel: "e", height: 35) {
                     CasioHaptics.tap()
                     if engine.shiftActive {
                         engine.shiftActive = false
@@ -620,36 +1132,392 @@ struct ContentView: View {
                         engine.insert("×10^")
                     }
                 }
-                casioButton(label: "Ans", shiftLabel: "DRG▶", alphaLabel: "", height: 36) {
+                casioButton(label: "Ans", shiftLabel: "DRG▶", alphaLabel: "", height: 35) {
                     CasioHaptics.tap()
-                    engine.insert("Ans")
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("°")
+                    } else {
+                        engine.insert("Ans")
+                    }
                 }
-                casioButton(label: "=", shiftLabel: "", alphaLabel: "", height: 36) {
+                casioButton(
+                    label: "=",
+                    shiftLabel: "",
+                    alphaLabel: "",
+                    fill: CasioTheme.keyEquals,
+                    ink: CasioTheme.inkWhite,
+                    labelFont: .system(size: 20, weight: .bold),
+                    height: 35
+                ) {
                     CasioHaptics.firm()
-                    engine.evaluate()
+                    switch engine.menuState {
+                    case .clrPrompt:
+                        engine.selectMenuOption(3) // Reset all
+                    case .eqnCoeffPrompt:
+                        let val = Double(codeBuffer) ?? 0
+                        codeBuffer = ""
+                        engine.advanceEqnCoeff(val: val)
+                    case .tablePrompt(let step):
+                        if step == 0 {
+                            engine.advanceTablePrompt()
+                        } else {
+                            let val = Double(codeBuffer)
+                            codeBuffer = ""
+                            engine.advanceTablePrompt(val: val)
+                        }
+                    case .calcPrompt:
+                        let val = Double(codeBuffer) ?? 0
+                        codeBuffer = ""
+                        engine.advanceCalc(val: val)
+                    case .solvePrompt:
+                        let guess = Double(codeBuffer) ?? (engine.variables["X"] ?? 0)
+                        codeBuffer = ""
+                        engine.executeSolve(guess: guess)
+                    default:
+                        engine.evaluate()
+                    }
                 }
             }
         }
     }
 
-    private func digitKey(_ digit: String, shift: String = "", alpha: String = "") -> some View {
-        casioButton(label: digit, shiftLabel: shift, alphaLabel: alpha, labelFont: .system(size: 20, weight: .semibold), height: 36) {
+    // MARK: - Reusable Key Building Blocks
+
+    private func metallicCircleButton(
+        title: String,
+        shiftTitle: String = "",
+        titleColor: Color = CasioTheme.inkWhite,
+        shiftColor: Color = CasioTheme.inkShift,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 1) {
+            HStack(spacing: 2) {
+                Text(title)
+                    .font(.system(size: 7.5, weight: .heavy))
+                    .foregroundColor(titleColor)
+                if !shiftTitle.isEmpty {
+                    Text(shiftTitle)
+                        .font(.system(size: 7, weight: .heavy))
+                        .foregroundColor(shiftColor)
+                }
+            }
+            .frame(height: 9)
+
+            Button(action: action) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(white: 0.65),
+                                Color(white: 0.38),
+                                Color(white: 0.52)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 29, height: 29)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+            }
+            .buttonStyle(CasioButtonStyle())
+        }
+    }
+
+    private func wingButton(
+        shift: String = "",
+        alpha: String = "",
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 1) {
+            HStack {
+                if !shift.isEmpty {
+                    Text(shift)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundColor(CasioTheme.inkShift)
+                }
+                Spacer(minLength: 0)
+                if !alpha.isEmpty {
+                    Text(alpha)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundColor(CasioTheme.inkAlpha)
+                }
+            }
+            .frame(height: 9)
+            .padding(.horizontal, 3)
+
+            Button(action: {
+                CasioHaptics.tap()
+                action()
+            }) {
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(CasioTheme.inkWhite)
+                    .frame(maxWidth: .infinity, minHeight: 25, maxHeight: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(CasioTheme.keyStandard)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(CasioTheme.keyStandardBevel, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(CasioButtonStyle())
+        }
+    }
+
+    private func wingButtonCustom<Content: View>(
+        shift: String = "",
+        alpha: String = "",
+        @ViewBuilder content: () -> Content,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 1) {
+            HStack {
+                if !shift.isEmpty {
+                    Text(shift)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundColor(CasioTheme.inkShift)
+                }
+                Spacer(minLength: 0)
+                if !alpha.isEmpty {
+                    Text(alpha)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundColor(CasioTheme.inkAlpha)
+                }
+            }
+            .frame(height: 9)
+            .padding(.horizontal, 3)
+
+            Button(action: {
+                CasioHaptics.tap()
+                action()
+            }) {
+                content()
+                    .frame(maxWidth: .infinity, minHeight: 25, maxHeight: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(CasioTheme.keyStandard)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(CasioTheme.keyStandardBevel, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(CasioButtonStyle())
+        }
+    }
+
+    private func funcKey(
+        _ label: String,
+        shift: String = "",
+        alpha: String = "",
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 1) {
+            HStack {
+                if !shift.isEmpty {
+                    Text(shift)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(CasioTheme.inkShift)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if !alpha.isEmpty {
+                    Text(alpha)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(alpha == "DEC" || alpha == "HEX" || alpha == "BIN" || alpha == "OCT" ? CasioTheme.inkBlue : CasioTheme.inkAlpha)
+                        .lineLimit(1)
+                }
+            }
+            .frame(height: 8)
+            .padding(.horizontal, 1)
+
+            Button(action: {
+                CasioHaptics.tap()
+                action()
+            }) {
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(CasioTheme.inkWhite)
+                    .frame(maxWidth: .infinity, minHeight: 25, maxHeight: 27)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(CasioTheme.keyStandard)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(CasioTheme.keyStandardBevel, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(CasioButtonStyle())
+        }
+    }
+
+    private func funcKeyCustom<Content: View>(
+        shift: String = "",
+        alpha: String = "",
+        @ViewBuilder content: () -> Content,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 1) {
+            HStack {
+                if !shift.isEmpty {
+                    Text(shift)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(CasioTheme.inkShift)
+                        .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if !alpha.isEmpty {
+                Text(alpha)
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundColor(alpha == "DEC" || alpha == "HEX" || alpha == "BIN" || alpha == "OCT" ? CasioTheme.inkBlue : CasioTheme.inkAlpha)
+                    .lineLimit(1)
+            }
+        }
+        .frame(height: 8)
+        .padding(.horizontal, 1)
+
+        Button(action: {
             CasioHaptics.tap()
+            action()
+        }) {
+            content()
+                .frame(maxWidth: .infinity, minHeight: 25, maxHeight: 27)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(CasioTheme.keyStandard)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(CasioTheme.keyStandardBevel, lineWidth: 1)
+                )
+        }
+        .buttonStyle(CasioButtonStyle())
+    }
+}
+
+    private func digitKey(_ digit: String, shift: String = "", alpha: String = "") -> some View {
+        casioButton(label: digit, shiftLabel: shift, alphaLabel: alpha, labelFont: .system(size: 19, weight: .semibold), height: 35) {
+            CasioHaptics.tap()
+
+            // Handle active prompts that accumulate numeric input
+            switch engine.menuState {
+            case .constPrompt:
+                codeBuffer.append(digit)
+                if codeBuffer.count == 2 {
+                    if let code = Int(codeBuffer) {
+                        engine.insertConstant(code: code)
+                    }
+                    engine.menuState = .none
+                    codeBuffer = ""
+                }
+                return
+
+            case .convPrompt:
+                codeBuffer.append(digit)
+                if codeBuffer.count == 2 {
+                    if let code = Int(codeBuffer) {
+                        engine.applyConversion(code: code)
+                    }
+                    engine.menuState = .none
+                    codeBuffer = ""
+                }
+                return
+
+            case .eqnCoeffPrompt, .calcPrompt, .solvePrompt:
+                codeBuffer.append(digit)
+                return
+
+            case .tablePrompt(let step) where step > 0 && step < 4:
+                codeBuffer.append(digit)
+                return
+
+            default:
+                break
+            }
+
+            // Handle SHIFT functions for digit keys
+            if engine.shiftActive {
+                engine.shiftActive = false
+                switch shift {
+                case "CONST":
+                    engine.menuState = .constPrompt
+                    codeBuffer = ""
+                    return
+                case "CONV":
+                    engine.menuState = .convPrompt
+                    codeBuffer = ""
+                    return
+                case "CLR":
+                    engine.menuState = .clrPrompt
+                    return
+                case "MATRIX":
+                    engine.menuState = .matrixMenu
+                    return
+                case "VECTOR":
+                    engine.menuState = .vectorMenu
+                    return
+                case "STAT":
+                    engine.menuState = .statTypeMenu
+                    return
+                case "CMPLX":
+                    engine.menuState = .cmplxMenu
+                    return
+                case "BASE":
+                    engine.setBaseN(.bin)
+                    return
+                case "Rnd":
+                    engine.insert("round(")
+                    return
+                case "Ran#":
+                    engine.insert("Ran#")
+                    return
+                default: break
+                }
+            }
+
+            // Handle ALPHA functions for digit keys
+            if engine.alphaActive {
+                engine.alphaActive = false
+                if alpha == "RanInt" {
+                    engine.insert("RanInt(")
+                    return
+                }
+            }
+
             if engine.menuState != .none, let n = Int(digit) {
                 engine.selectMenuOption(n)
-            } else if engine.shiftActive && shift == "π" {
-                engine.shiftActive = false
-                engine.insert("π")
-            } else {
-                engine.insert(digit)
+                return
             }
+
+            // Normal digit entry
+            engine.insert(digit)
         }
     }
 
     private func opKey(_ symbol: String, shift: String = "") -> some View {
-        casioButton(label: symbol, shiftLabel: shift, alphaLabel: "", labelFont: .system(size: 19, weight: .semibold), height: 36) {
+        casioButton(label: symbol, shiftLabel: shift, alphaLabel: "", labelFont: .system(size: 19, weight: .semibold), height: 35) {
             CasioHaptics.tap()
-            engine.insert(symbol)
+            if engine.shiftActive {
+                engine.shiftActive = false
+                switch shift {
+                case "nPr": engine.insert(" nPr ")
+                case "nCr": engine.insert(" nCr ")
+                case "Pol": engine.insert("Pol(")
+                case "Rec": engine.insert("Rec(")
+                default: engine.insert(symbol)
+                }
+            } else {
+                engine.insert(symbol)
+            }
         }
     }
 
@@ -661,8 +1529,8 @@ struct ContentView: View {
         alphaLabel: String = "",
         fill: Color = CasioTheme.keyStandard,
         ink: Color = CasioTheme.inkWhite,
-        labelFont: Font = .system(size: 13, weight: .semibold),
-        height: CGFloat = 32,
+        labelFont: Font = .system(size: 12, weight: .semibold),
+        height: CGFloat = 30,
         action: @escaping () -> Void
     ) -> some View {
         VStack(spacing: 1) {
@@ -670,19 +1538,19 @@ struct ContentView: View {
             HStack {
                 if !shiftLabel.isEmpty {
                     Text(shiftLabel)
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 7.5, weight: .bold))
                         .foregroundColor(CasioTheme.inkShift)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 if !alphaLabel.isEmpty {
                     Text(alphaLabel)
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(CasioTheme.inkAlpha)
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundColor(alphaLabel == "DEC" || alphaLabel == "HEX" || alphaLabel == "BIN" || alphaLabel == "OCT" ? CasioTheme.inkBlue : CasioTheme.inkAlpha)
                         .lineLimit(1)
                 }
             }
-            .frame(height: 10)
+            .frame(height: 9)
             .padding(.horizontal, 2)
 
             // Physical Button Cap
@@ -692,11 +1560,11 @@ struct ContentView: View {
                     .foregroundColor(ink)
                     .frame(maxWidth: .infinity, maxHeight: height)
                     .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(fill)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .stroke(CasioTheme.keyStandardBevel, lineWidth: 1)
                     )
             }
