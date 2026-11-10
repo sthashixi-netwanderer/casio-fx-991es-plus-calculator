@@ -36,6 +36,16 @@ struct CasioEvaluatorTests {
         let linear = mgr.toLinearString()
         assertStringEqual(linear, "(2)/(3)+√(2)")
 
+        // 0.1 Exact Multi-Term Symbolic Engine
+        let s18 = ExactValue.surd(radicand: 18)
+        assertEqual(s18.toDouble(), Foundation.sqrt(18.0), accuracy: 1e-6, "sqrt(18) should equal sqrt(18)")
+        let halfSqrt2 = ExactValue.surd(coeff: Rational(1, 2), radicand: 2)
+        let thirdSqrt2 = ExactValue.surd(coeff: Rational(1, 3), radicand: 2)
+        let sumSurd = halfSqrt2 + thirdSqrt2
+        assertEqual(sumSurd.toDouble(), Foundation.sqrt(2.0) * 5.0 / 6.0, accuracy: 1e-6, "sqrt(2)/2 + sqrt(2)/3 should be 5*sqrt(2)/6")
+        let nodes = sumSurd.toMathNodes()
+        assertTrue(!nodes.isEmpty, "toMathNodes() should not be empty")
+
         // 1. Arithmetic precedence
         let res1 = CasioEvaluator.evaluate("2+3×4", angleUnit: .deg)
         assertEqual(res1.value ?? 0, 14.0, "2+3×4 should be 14")
