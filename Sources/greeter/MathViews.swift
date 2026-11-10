@@ -53,12 +53,14 @@ public struct MathASTView: View {
     @ViewBuilder
     private var emptySlotPlaceholder: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 1.5)
-                .stroke(
-                    isSlotFocused ? CasioTheme.lcdTextActive : CasioTheme.lcdTextDim,
-                    style: StrokeStyle(lineWidth: 1, dash: [2, 1.5])
-                )
-                .frame(width: max(8, fontSize * 0.75), height: max(10, fontSize * 0.9))
+            if slot != .root {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .stroke(
+                        isSlotFocused ? CasioTheme.lcdTextActive : CasioTheme.lcdTextDim,
+                        style: StrokeStyle(lineWidth: 1, dash: [2, 1.5])
+                    )
+                    .frame(width: max(8, fontSize * 0.75), height: max(10, fontSize * 0.9))
+            }
 
             if showCursor && isSlotFocused {
                 cursorBar

@@ -1746,14 +1746,20 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
     }
 
-    public func moveCursorUp() {
+    @discardableResult
+    public func moveCursorUp() -> Bool {
+        let oldSlot = astManager.cursor.slot
+        let oldIndex = astManager.cursor.index
         astManager.moveUp()
-        cursorPosition = astManager.cursor.index
+        return astManager.cursor.slot != oldSlot || astManager.cursor.index != oldIndex
     }
 
-    public func moveCursorDown() {
+    @discardableResult
+    public func moveCursorDown() -> Bool {
+        let oldSlot = astManager.cursor.slot
+        let oldIndex = astManager.cursor.index
         astManager.moveDown()
-        cursorPosition = astManager.cursor.index
+        return astManager.cursor.slot != oldSlot || astManager.cursor.index != oldIndex
     }
 
     public func moveHistoryUp() {
@@ -1939,8 +1945,12 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         case .setupMenu(let page):
             if page == 1 {
                 switch number {
-                case 1: menuState = .mthIOMenu
-                case 2: menuState = .none // LineIO
+                case 1:
+                    isMthIO = true
+                    menuState = .mthIOMenu
+                case 2:
+                    isMthIO = false
+                    menuState = .none // LineIO
                 case 3: angleUnit = .deg; menuState = .none
                 case 4: angleUnit = .rad; menuState = .none
                 case 5: angleUnit = .gra; menuState = .none
@@ -1961,6 +1971,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             }
 
         case .mthIOMenu:
+            isMthIO = true
             menuState = .none
 
         case .eqnTypeMenu:

@@ -564,6 +564,12 @@ public struct MathASTManager: Sendable {
         case .summationExpr(let id):
             let upNodes = getNodes(in: .summationUpper(id))
             cursor = CursorPath(slot: .summationUpper(id), index: min(cursor.index, upNodes.count))
+        case .logBase(let id):
+            let argNodes = getNodes(in: .logArg(id))
+            cursor = CursorPath(slot: .logArg(id), index: min(cursor.index, argNodes.count))
+        case .exponentBase(let id):
+            let powerNodes = getNodes(in: .exponentPower(id))
+            cursor = CursorPath(slot: .exponentPower(id), index: min(cursor.index, powerNodes.count))
         default:
             break
         }
@@ -586,6 +592,11 @@ public struct MathASTManager: Sendable {
         case .summationExpr(let id):
             let lowNodes = getNodes(in: .summationLower(id))
             cursor = CursorPath(slot: .summationLower(id), index: min(cursor.index, lowNodes.count))
+        case .logArg(let id):
+            let baseNodes = getNodes(in: .logBase(id))
+            cursor = CursorPath(slot: .logBase(id), index: min(cursor.index, baseNodes.count))
+        case .exponentPower:
+            exitSlotRight()
         default:
             break
         }

@@ -279,7 +279,7 @@ struct ContentView: View {
                     }
                 )
         }
-        .frame(height: 124)
+        .frame(height: 128)
     }
 
     // MARK: - Annunciator Bar
@@ -299,7 +299,7 @@ struct ContentView: View {
             annunciator("G", active: engine.angleUnit == .gra)
             annunciator("Fix", active: isFixFormat)
             annunciator("Sci", active: isSciFormat)
-            annunciator("Math", active: true)
+            annunciator("Math", active: engine.isMthIO)
             annunciator("▲", active: !engine.history.isEmpty)
             annunciator("▼", active: engine.historyIndex >= 0)
         }
@@ -325,44 +325,71 @@ struct ContentView: View {
     // MARK: - Expression & Result Display
 
     private var expressionDisplayView: some View {
-        VStack(spacing: 2) {
-            // Expression Line (Top, Left-aligned, with Cursor)
+        VStack(spacing: 0) {
+            // Expression Line (Top, Left-aligned, with 2D Cursor in MthIO)
             HStack(spacing: 0) {
                 if engine.activeMode == .baseN {
                     Text("\(engine.baseNType.rawValue) ")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                 }
-                Text(renderedExpression)
-                    .font(.system(size: 16, weight: .medium, design: .monospaced))
-                    .foregroundColor(CasioTheme.lcdTextActive)
-                    .lineLimit(1)
-                Spacer()
-            }
-            .frame(height: 26)
 
-            Spacer()
+                if engine.isMthIO {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        MathASTView(
+                            nodes: engine.astManager.root,
+                            slot: .root,
+                            cursor: engine.astManager.cursor,
+                            fontSize: 16,
+                            showCursor: true
+                        )
+                        .padding(.vertical, 2)
+                    }
+                } else {
+                    Text(renderedExpression)
+                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 38, maxHeight: 46, alignment: .leading)
+
+            Spacer(minLength: 0)
 
             // Result / Error Line (Bottom, Right-aligned)
-            HStack {
+            HStack(spacing: 0) {
                 if engine.isError {
                     Text(engine.result)
-                        .font(.system(size: 19, weight: .heavy, design: .monospaced))
+                        .font(.system(size: 18, weight: .heavy, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                     Spacer()
                     Text("[AC]:Cancel")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                 } else {
-                    Spacer()
-                    Text(engine.result)
-                        .font(.system(size: 30, weight: .semibold, design: .monospaced))
-                        .foregroundColor(CasioTheme.lcdTextActive)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.3)
+                    Spacer(minLength: 0)
+                    if let exact = engine.exactResult, !engine.isShowingDecimal, engine.isMthIO {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            MathASTView(
+                                nodes: exact.toMathNodes(),
+                                slot: .root,
+                                cursor: nil,
+                                fontSize: 20,
+                                showCursor: false
+                            )
+                            .padding(.vertical, 2)
+                        }
+                    } else {
+                        Text(engine.result)
+                            .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                            .foregroundColor(CasioTheme.lcdTextActive)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.3)
+                    }
                 }
             }
-            .frame(height: 38)
+            .frame(minHeight: 36, maxHeight: 44, alignment: .trailing)
         }
     }
 
@@ -633,7 +660,11 @@ struct ContentView: View {
                         engine.startSolve()
                     } else if engine.alphaActive {
                         engine.alphaActive = false
-                        engine.insert("=")
+                        if engine.isMthIO {
+                            engine.insertASTText("=")
+                        } else {
+                            engine.insert("=")
+                        }
                     } else {
                         engine.startCalc()
                     }
@@ -645,12 +676,24 @@ struct ContentView: View {
                 } action: {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("d/dx(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("d/dx")
+                        } else {
+                            engine.insert("d/dx(")
+                        }
                     } else if engine.alphaActive {
                         engine.alphaActive = false
-                        engine.insert(":")
+                        if engine.isMthIO {
+                            engine.insertASTText(":")
+                        } else {
+                            engine.insert(":")
+                        }
                     } else {
-                        engine.insert("∫(")
+                        if engine.isMthIO {
+                            engine.insertASTIntegral()
+                        } else {
+                            engine.insert("∫(")
+                        }
                     }
                 }
             }
@@ -685,9 +728,19 @@ struct ContentView: View {
                 wingButton(shift: "x!", alpha: "", label: "x⁻¹") {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("!")
+                        if engine.isMthIO {
+                            engine.insertASTText("!")
+                        } else {
+                            engine.insert("!")
+                        }
                     } else {
-                        engine.insert("^(-1)")
+                        if engine.isMthIO {
+                            engine.insertASTExponent()
+                            engine.insertASTText("-1")
+                            engine.moveCursorRight()
+                        } else {
+                            engine.insert("^(-1)")
+                        }
                     }
                 }
 
@@ -697,9 +750,17 @@ struct ContentView: View {
                 } action: {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("Σ(")
+                        if engine.isMthIO {
+                            engine.insertASTSummation()
+                        } else {
+                            engine.insert("Σ(")
+                        }
                     } else {
-                        engine.insert("log(")
+                        if engine.isMthIO {
+                            engine.insertASTLogBase()
+                        } else {
+                            engine.insert("log(")
+                        }
                     }
                 }
             }
@@ -821,6 +882,8 @@ struct ContentView: View {
             if !engine.tableRows.isEmpty && tableScrollIndex > 0 {
                 tableScrollIndex -= 1
             }
+        } else if engine.isMthIO && engine.moveCursorUp() {
+            // Navigated up within 2D AST slots
         } else {
             engine.moveHistoryUp()
         }
@@ -836,6 +899,8 @@ struct ContentView: View {
             }
         } else if case .setupMenu(let page) = engine.menuState {
             engine.openSetupMenu(page: page == 1 ? 2 : 1)
+        } else if engine.isMthIO && engine.moveCursorDown() {
+            // Navigated down within 2D AST slots
         } else {
             engine.moveHistoryDown()
         }
@@ -847,19 +912,34 @@ struct ContentView: View {
         VStack(spacing: 4) {
             // Row 1: ■/□, √□, x², x^■, log, ln
             HStack(spacing: 4) {
-                funcKeyCustom(shift: "a b/c", alpha: "") {
+                funcKeyCustom(shift: "a b/c ⇔ d/c", alpha: "") {
                     FractionKeyFace()
                 } action: {
-                    engine.insert("÷")
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.toggleSD()
+                    } else if engine.isMthIO {
+                        engine.insertASTFraction()
+                    } else {
+                        engine.insert("÷")
+                    }
                 }
                 funcKeyCustom(shift: "∛", alpha: "") {
                     SqrtKeyFace()
                 } action: {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("∛(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("∛")
+                        } else {
+                            engine.insert("∛(")
+                        }
                     } else {
-                        engine.insert("√(")
+                        if engine.isMthIO {
+                            engine.insertASTRadical()
+                        } else {
+                            engine.insert("√(")
+                        }
                     }
                 }
                 funcKey("x²", shift: "x³", alpha: "DEC") {
@@ -867,9 +947,21 @@ struct ContentView: View {
                         engine.setBaseN(.dec)
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("³")
+                        if engine.isMthIO {
+                            engine.insertASTExponent()
+                            engine.insertASTText("3")
+                            engine.moveCursorRight()
+                        } else {
+                            engine.insert("³")
+                        }
                     } else {
-                        engine.insert("²")
+                        if engine.isMthIO {
+                            engine.insertASTExponent()
+                            engine.insertASTText("2")
+                            engine.moveCursorRight()
+                        } else {
+                            engine.insert("²")
+                        }
                     }
                 }
                 funcKeyCustom(shift: "ˣ√", alpha: "HEX") {
@@ -879,9 +971,17 @@ struct ContentView: View {
                         engine.setBaseN(.hex)
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("^(1÷")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("x√")
+                        } else {
+                            engine.insert("^(1÷")
+                        }
                     } else {
-                        engine.insert("^(")
+                        if engine.isMthIO {
+                            engine.insertASTExponent()
+                        } else {
+                            engine.insert("^(")
+                        }
                     }
                 }
                 funcKey("log", shift: "10^■", alpha: "BIN") {
@@ -889,9 +989,18 @@ struct ContentView: View {
                         engine.setBaseN(.bin)
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("10^(")
+                        if engine.isMthIO {
+                            engine.insertASTText("10")
+                            engine.insertASTExponent()
+                        } else {
+                            engine.insert("10^(")
+                        }
                     } else {
-                        engine.insert("log(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("log")
+                        } else {
+                            engine.insert("log(")
+                        }
                     }
                 }
                 funcKey("ln", shift: "e^■", alpha: "OCT") {
@@ -899,9 +1008,18 @@ struct ContentView: View {
                         engine.setBaseN(.oct)
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("e^(")
+                        if engine.isMthIO {
+                            engine.insertASTText("e")
+                            engine.insertASTExponent()
+                        } else {
+                            engine.insert("e^(")
+                        }
                     } else {
-                        engine.insert("ln(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("ln")
+                        } else {
+                            engine.insert("ln(")
+                        }
                     }
                 }
             }
@@ -917,6 +1035,8 @@ struct ContentView: View {
                         handleVariableKey("A")
                     } else if isPromptActive {
                         codeBuffer.append("-")
+                    } else if engine.isMthIO {
+                        engine.insertASTText("-")
                     } else {
                         engine.insert("-")
                     }
@@ -938,9 +1058,17 @@ struct ContentView: View {
                         handleVariableKey("C")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("abs(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("Abs")
+                        } else {
+                            engine.insert("abs(")
+                        }
                     } else {
-                        engine.insert("sinh(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("sinh")
+                        } else {
+                            engine.insert("sinh(")
+                        }
                     }
                 }
                 funcKey("sin", shift: "sin⁻¹", alpha: "D") {
@@ -949,9 +1077,17 @@ struct ContentView: View {
                         handleVariableKey("D")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("sin⁻¹(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("sin⁻¹")
+                        } else {
+                            engine.insert("sin⁻¹(")
+                        }
                     } else {
-                        engine.insert("sin(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("sin")
+                        } else {
+                            engine.insert("sin(")
+                        }
                     }
                 }
                 funcKey("cos", shift: "cos⁻¹", alpha: "E") {
@@ -960,9 +1096,17 @@ struct ContentView: View {
                         handleVariableKey("E")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("cos⁻¹(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("cos⁻¹")
+                        } else {
+                            engine.insert("cos⁻¹(")
+                        }
                     } else {
-                        engine.insert("cos(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("cos")
+                        } else {
+                            engine.insert("cos(")
+                        }
                     }
                 }
                 funcKey("tan", shift: "tan⁻¹", alpha: "F") {
@@ -971,9 +1115,17 @@ struct ContentView: View {
                         handleVariableKey("F")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("tan⁻¹(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("tan⁻¹")
+                        } else {
+                            engine.insert("tan⁻¹(")
+                        }
                     } else {
-                        engine.insert("tan(")
+                        if engine.isMthIO {
+                            engine.insertASTFunction("tan")
+                        } else {
+                            engine.insert("tan(")
+                        }
                     }
                 }
             }
@@ -985,7 +1137,11 @@ struct ContentView: View {
                         engine.shiftActive = false
                         waitingForSto = true
                     } else {
-                        engine.insert("A")
+                        if engine.isMthIO {
+                            engine.insertASTText("A")
+                        } else {
+                            engine.insert("A")
+                        }
                     }
                 }
                 funcKey("ENG", shift: "←", alpha: "i") {
@@ -994,7 +1150,11 @@ struct ContentView: View {
                         engine.cycleEng()
                     } else if engine.alphaActive || engine.activeMode == .cmplx {
                         engine.alphaActive = false
-                        engine.insert("i")
+                        if engine.isMthIO {
+                            engine.insertASTText("i")
+                        } else {
+                            engine.insert("i")
+                        }
                     } else {
                         engine.cycleEng()
                     }
@@ -1005,9 +1165,17 @@ struct ContentView: View {
                         handleVariableKey("X")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("%")
+                        if engine.isMthIO {
+                            engine.insertASTText("%")
+                        } else {
+                            engine.insert("%")
+                        }
                     } else {
-                        engine.insert("(")
+                        if engine.isMthIO {
+                            engine.insertASTParens()
+                        } else {
+                            engine.insert("(")
+                        }
                     }
                 }
                 funcKey(")", shift: ",", alpha: "Y") {
@@ -1016,9 +1184,17 @@ struct ContentView: View {
                         handleVariableKey("Y")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert(",")
+                        if engine.isMthIO {
+                            engine.insertASTText(",")
+                        } else {
+                            engine.insert(",")
+                        }
                     } else {
-                        engine.insert(")")
+                        if engine.isMthIO {
+                            engine.insertASTText(")")
+                        } else {
+                            engine.insert(")")
+                        }
                     }
                 }
                 funcKey("S⇔D", shift: "a b/c ⇔ d/c", alpha: "") {
@@ -1044,7 +1220,11 @@ struct ContentView: View {
             waitingForSto = false
             engine.storeToVariable(varName)
         } else {
-            engine.insert(String(varName))
+            if engine.isMthIO {
+                engine.insertASTText(String(varName))
+            } else {
+                engine.insert(String(varName))
+            }
         }
     }
 
@@ -1124,12 +1304,24 @@ struct ContentView: View {
                     CasioHaptics.tap()
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("π")
+                        if engine.isMthIO {
+                            engine.insertASTText("π")
+                        } else {
+                            engine.insert("π")
+                        }
                     } else if engine.alphaActive {
                         engine.alphaActive = false
-                        engine.insert("e")
+                        if engine.isMthIO {
+                            engine.insertASTText("e")
+                        } else {
+                            engine.insert("e")
+                        }
                     } else {
-                        engine.insert("×10^")
+                        if engine.isMthIO {
+                            engine.insertASTText("×10^")
+                        } else {
+                            engine.insert("×10^")
+                        }
                     }
                 }
                 casioButton(label: "Ans", shiftLabel: "DRG▶", alphaLabel: "", height: 35) {
@@ -1138,7 +1330,11 @@ struct ContentView: View {
                         engine.shiftActive = false
                         engine.insert("°")
                     } else {
-                        engine.insert("Ans")
+                        if engine.isMthIO {
+                            engine.insertASTText("Ans")
+                        } else {
+                            engine.insert("Ans")
+                        }
                     }
                 }
                 casioButton(
@@ -1499,7 +1695,11 @@ struct ContentView: View {
             }
 
             // Normal digit entry
-            engine.insert(digit)
+            if engine.isMthIO {
+                engine.insertASTText(digit)
+            } else {
+                engine.insert(digit)
+            }
         }
     }
 
@@ -1509,14 +1709,23 @@ struct ContentView: View {
             if engine.shiftActive {
                 engine.shiftActive = false
                 switch shift {
-                case "nPr": engine.insert(" nPr ")
-                case "nCr": engine.insert(" nCr ")
-                case "Pol": engine.insert("Pol(")
-                case "Rec": engine.insert("Rec(")
-                default: engine.insert(symbol)
+                case "nPr":
+                    if engine.isMthIO { engine.insertASTText("P") } else { engine.insert(" nPr ") }
+                case "nCr":
+                    if engine.isMthIO { engine.insertASTText("C") } else { engine.insert(" nCr ") }
+                case "Pol":
+                    if engine.isMthIO { engine.insertASTFunction("Pol") } else { engine.insert("Pol(") }
+                case "Rec":
+                    if engine.isMthIO { engine.insertASTFunction("Rec") } else { engine.insert("Rec(") }
+                default:
+                    if engine.isMthIO { engine.insertASTText(symbol) } else { engine.insert(symbol) }
                 }
             } else {
-                engine.insert(symbol)
+                if engine.isMthIO {
+                    engine.insertASTText(symbol)
+                } else {
+                    engine.insert(symbol)
+                }
             }
         }
     }
