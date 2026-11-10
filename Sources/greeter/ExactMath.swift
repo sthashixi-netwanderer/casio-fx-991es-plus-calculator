@@ -422,19 +422,61 @@ public enum ExactEvaluator {
                 tokens.append(.val(res))
 
             case .radical(_, let index, let radicand):
-                guard index == nil else { return nil } // square root only for exact surds
                 guard let radVal = evaluate(nodes: radicand, angleUnit: angleUnit) else { return nil }
-                // Check if radVal is a pure rational
-                if radVal.surdTerms.count == 1, let q = radVal.surdTerms[1], radVal.piCoeff.isZero, q > .zero {
-                    // sqrt(num / den) = sqrt(num * den) / den
-                    let prod = q.num * q.den
-                    let (outside, inside) = ExactValue.squareFreeFactor(prod)
-                    let coeff = Rational(outside, q.den)
-                    let res = ExactValue.surd(coeff: coeff, radicand: inside)
+                if let idx = index {
+                    // Exact integer nth-root
+                    guard let idxVal = evaluate(nodes: idx, angleUnit: angleUnit),
+                          idxVal.surdTerms.count == 1, let idxQ = idxVal.surdTerms[1], idxVal.piCoeff.isZero, idxQ.den == 1, idxQ.num >= 2 else { return nil }
+                    let n = idxQ.num
+                    guard radVal.surdTerms.count == 1, let q = radVal.surdTerms[1], radVal.piCoeff.isZero, q.den == 1, q.num >= 0 else { return nil }
+                    let radicandInt = q.num
+                    let rootDouble = pow(Double(radicandInt), 1.0 / Double(n))
+                    let rootRound = Int64(round(rootDouble))
+                    var check: Int64 = 1
+                    for _ in 0..<n { check *= rootRound }
+                    if check == radicandInt {
+                        if let last = tokens.last, canImplicitMultiply(last) {
+                            tokens.append(.binaryOp("×", 3))
+                        }
+                        tokens.append(.val(.rational(Rational(rootRound, 1))))
+                    } else {
+                        return nil
+                    }
+                } else {
+                    // Square root
+                    if radVal.surdTerms.count == 1, let q = radVal.surdTerms[1], radVal.piCoeff.isZero, q > .zero {
+                        // sqrt(num / den) = sqrt(num * den) / den
+                        let prod = q.num * q.den
+                        let (outside, inside) = ExactValue.squareFreeFactor(prod)
+                        let coeff = Rational(outside, q.den)
+                        let res = ExactValue.surd(coeff: coeff, radicand: inside)
+                        if let last = tokens.last, canImplicitMultiply(last) {
+                            tokens.append(.binaryOp("×", 3))
+                        }
+                        tokens.append(.val(res))
+                    } else {
+                        return nil
+                    }
+                }
+
+            case .logBase(_, let base, let arg):
+                guard let bVal = evaluate(nodes: base, angleUnit: angleUnit),
+                      let aVal = evaluate(nodes: arg, angleUnit: angleUnit) else { return nil }
+                guard bVal.surdTerms.count == 1, let bQ = bVal.surdTerms[1], bVal.piCoeff.isZero, bQ.den == 1, bQ.num > 1,
+                      aVal.surdTerms.count == 1, let aQ = aVal.surdTerms[1], aVal.piCoeff.isZero, aQ.den == 1, aQ.num >= 1 else { return nil }
+                let b = bQ.num
+                let a = aQ.num
+                var cur: Int64 = 1
+                var exp: Int64 = 0
+                while cur < a && exp < 60 {
+                    cur *= b
+                    exp += 1
+                }
+                if cur == a {
                     if let last = tokens.last, canImplicitMultiply(last) {
                         tokens.append(.binaryOp("×", 3))
                     }
-                    tokens.append(.val(res))
+                    tokens.append(.val(.rational(Rational(exp, 1))))
                 } else {
                     return nil
                 }

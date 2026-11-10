@@ -63,6 +63,44 @@ struct CasioEvaluatorTests {
         testEng.toggleSD()
         assertTrue(testEng.isShowingDecimal, "Pressing S<=>D should toggle to decimal")
 
+        // 0.3 Arbitrary Base Logarithm: log_2(8) = 3
+        let logEng = CalculatorEngine()
+        logEng.insertASTLogBase()
+        logEng.insertASTText("2")
+        logEng.moveCursorRight()
+        logEng.insertASTText("8")
+        logEng.evaluate()
+        assertEqual(Double(logEng.result) ?? (logEng.exactResult?.toDouble() ?? 0), 3.0, accuracy: 1e-6, "log_2(8) should evaluate to 3")
+
+        // 0.4 Nth Root: 3√8 = 2
+        let rootEng = CalculatorEngine()
+        rootEng.insertASTNthRoot()
+        rootEng.insertASTText("3")
+        rootEng.moveCursorRight()
+        rootEng.insertASTText("8")
+        rootEng.evaluate()
+        assertEqual(Double(rootEng.result) ?? (rootEng.exactResult?.toDouble() ?? 0), 2.0, accuracy: 1e-6, "3√8 should evaluate to 2")
+
+        // 0.5 Template Deletion Without Trap
+        let trapEng = CalculatorEngine()
+        trapEng.insertASTFraction()
+        assertTrue(!trapEng.astManager.root.isEmpty, "Fraction should be created")
+        trapEng.delete()
+        assertTrue(trapEng.astManager.root.isEmpty, "Empty fraction should be deleted without getting trapped")
+
+        let captureEng = CalculatorEngine()
+        captureEng.insertASTText("5")
+        captureEng.insertASTFraction()
+        captureEng.delete()
+        assertStringEqual(captureEng.astManager.toLinearString(), "5", "Deleting empty denominator should restore numerator")
+
+        // 0.6 Transcendental Non-Coercion (1 / (2π) must not coerce to 113/710)
+        let piEng = CalculatorEngine()
+        piEng.insert("1÷(2×π)")
+        piEng.evaluate()
+        assertTrue(!piEng.result.contains("113"), "1/(2π) should display decimal, not 113/710")
+        assertEqual(Double(piEng.result) ?? 0, 1.0 / (2.0 * Double.pi), accuracy: 1e-6, "1/(2π) should equal 0.159155")
+
         // 1. Arithmetic precedence
         let res1 = CasioEvaluator.evaluate("2+3×4", angleUnit: .deg)
         assertEqual(res1.value ?? 0, 14.0, "2+3×4 should be 14")

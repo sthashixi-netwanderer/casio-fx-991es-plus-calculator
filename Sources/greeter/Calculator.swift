@@ -1614,7 +1614,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertText(text)
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTFraction() {
@@ -1623,7 +1623,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertFraction()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTRadical() {
@@ -1632,7 +1632,25 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertRadical()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
+    }
+
+    public func insertASTNthRoot() {
+        if isError {
+            clearAll()
+        }
+        astManager.insertNthRoot()
+        expression = astManager.toLinearString()
+        cursorPosition = expression.count
+    }
+
+    public func insertASTCubeRoot() {
+        if isError {
+            clearAll()
+        }
+        astManager.insertCubeRoot()
+        expression = astManager.toLinearString()
+        cursorPosition = expression.count
     }
 
     public func insertASTExponent() {
@@ -1641,7 +1659,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertExponent()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTIntegral() {
@@ -1650,7 +1668,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertIntegral()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTSummation() {
@@ -1659,7 +1677,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertSummation()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTLogBase() {
@@ -1668,7 +1686,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertLogBase()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTParens() {
@@ -1677,7 +1695,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertParens()
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     public func insertASTFunction(_ name: String) {
@@ -1686,7 +1704,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         astManager.insertFunction(name)
         expression = astManager.toLinearString()
-        cursorPosition = astManager.cursor.index
+        cursorPosition = expression.count
     }
 
     // MARK: - Backward-Compatible Linear Editing
@@ -1718,8 +1736,11 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             return
         }
 
-        if !astManager.root.isEmpty {
+        if isMthIO && !astManager.root.isEmpty {
             astManager.delete()
+            expression = astManager.toLinearString()
+            cursorPosition = expression.count
+            return
         }
 
         let chars = Array(expression)
@@ -1844,8 +1865,9 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         } else if let val = eval.value {
             isError = false
             lastAnswer = val
-            // Check if can be represented as an exact fraction in MthIO mode
-            if let frac = Fraction.fromDouble(val), frac.den > 1 && frac.den <= 10000 && isMthIO {
+            // Check if can be represented as an exact fraction in MthIO mode (skip if transcendental pi or e present)
+            let hasTranscendental = linear.contains("π") || linear.contains("e")
+            if !hasTranscendental, let frac = Fraction.fromDouble(val), frac.den > 1 && frac.den <= 10000 && isMthIO {
                 let exactFrac = ExactValue.rational(Rational(frac.num, frac.den))
                 exactResult = exactFrac
                 isShowingDecimal = false

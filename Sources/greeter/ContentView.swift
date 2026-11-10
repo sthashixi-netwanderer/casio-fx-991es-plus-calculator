@@ -930,7 +930,7 @@ struct ContentView: View {
                     if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
-                            engine.insertASTFunction("∛")
+                            engine.insertASTCubeRoot()
                         } else {
                             engine.insert("∛(")
                         }
@@ -972,7 +972,7 @@ struct ContentView: View {
                     } else if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
-                            engine.insertASTFunction("x√")
+                            engine.insertASTNthRoot()
                         } else {
                             engine.insert("^(1÷")
                         }

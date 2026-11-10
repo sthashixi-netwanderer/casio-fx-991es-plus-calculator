@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>casio fx-991ES caculator</string>
+    <string>Casio fx-991ES Calculator</string>
     <key>CFBundleName</key>
-    <string>casio fx-991ES caculator</string>
+    <string>Casio fx-991ES Calculator</string>
     <key>CFBundleIdentifier</key>
     <string>com.example.greeter</string>
     <key>CFBundlePackageType</key>

@@ -65,7 +65,7 @@ public indirect enum MathNode: Identifiable, Equatable, Sendable {
             let radStr = radicand.map { $0.toLinearString() }.joined()
             if let index = index {
                 let idxStr = index.map { $0.toLinearString() }.joined()
-                return "\(idxStr)√(\(radStr))"
+                return "((\(radStr))^(1÷(\(idxStr))))"
             }
             return "√(\(radStr))"
         case .integral(_, let integrand, let lower, let upper):
@@ -81,7 +81,7 @@ public indirect enum MathNode: Identifiable, Equatable, Sendable {
         case .logBase(_, let base, let arg):
             let bStr = base.map { $0.toLinearString() }.joined()
             let aStr = arg.map { $0.toLinearString() }.joined()
-            return "log_(\(bStr))(\(aStr))"
+            return "(log(\(aStr))÷log(\(bStr)))"
         case .parens(_, let children):
             let cStr = children.map { $0.toLinearString() }.joined()
             return "(\(cStr))"
@@ -388,6 +388,34 @@ public struct MathASTManager: Sendable {
         cursor = CursorPath(slot: .radicalRadicand(id), index: 0)
     }
 
+    public mutating func insertNthRoot() {
+        let id = UUID()
+        let targetSlot = cursor.slot
+        let targetIndex = cursor.index
+        let node = MathNode.radical(id: id, index: [], radicand: [])
+        updateSlot(slot: targetSlot) { nodes in
+            var updated = nodes
+            let safeIdx = min(max(0, targetIndex), updated.count)
+            updated.insert(node, at: safeIdx)
+            return updated
+        }
+        cursor = CursorPath(slot: .radicalIndex(id), index: 0)
+    }
+
+    public mutating func insertCubeRoot() {
+        let id = UUID()
+        let targetSlot = cursor.slot
+        let targetIndex = cursor.index
+        let node = MathNode.radical(id: id, index: [.text(id: UUID(), content: "3")], radicand: [])
+        updateSlot(slot: targetSlot) { nodes in
+            var updated = nodes
+            let safeIdx = min(max(0, targetIndex), updated.count)
+            updated.insert(node, at: safeIdx)
+            return updated
+        }
+        cursor = CursorPath(slot: .radicalRadicand(id), index: 0)
+    }
+
     public mutating func insertExponent() {
         let currentNodes = getNodes(in: cursor.slot)
         let targetSlot = cursor.slot
@@ -511,8 +539,42 @@ public struct MathASTManager: Sendable {
                 cursor.index -= 1
             }
         } else if cursor.index == 0 && cursor.slot != .root {
-            // Move out of current sub-slot to parent
-            exitSlotLeft()
+            guard let parentInfo = findParentSlot(of: cursor.slot, in: root) else { return }
+            let parentNodes = getNodes(in: parentInfo.parentSlot)
+            guard parentInfo.nodeIndexInParent < parentNodes.count else { return }
+            let enclosingNode = parentNodes[parentInfo.nodeIndexInParent]
+
+            if currentNodes.isEmpty {
+                var replacement: [MathNode] = []
+                switch enclosingNode {
+                case .fraction(let id, let num, let den):
+                    if cursor.slot == .fractionDenominator(id) {
+                        replacement = num
+                    } else if cursor.slot == .fractionNumerator(id) && !den.isEmpty {
+                        replacement = den
+                    }
+                case .exponent(_, let base, _):
+                    replacement = base
+                case .radical(let id, let index, _):
+                    if cursor.slot == .radicalRadicand(id) && index != nil {
+                        replacement = index ?? []
+                    }
+                default:
+                    break
+                }
+
+                updateSlot(slot: parentInfo.parentSlot) { nodes in
+                    var updated = nodes
+                    updated.remove(at: parentInfo.nodeIndexInParent)
+                    if !replacement.isEmpty {
+                        updated.insert(contentsOf: replacement, at: parentInfo.nodeIndexInParent)
+                    }
+                    return updated
+                }
+                cursor = CursorPath(slot: parentInfo.parentSlot, index: parentInfo.nodeIndexInParent + replacement.count)
+            } else {
+                exitSlotLeft()
+            }
         }
     }
 
@@ -631,11 +693,54 @@ public struct MathASTManager: Sendable {
     }
 
     private mutating func exitSlotRight() {
+        switch cursor.slot {
+        case .radicalIndex(let id):
+            cursor = CursorPath(slot: .radicalRadicand(id), index: 0)
+            return
+        case .logBase(let id):
+            cursor = CursorPath(slot: .logArg(id), index: 0)
+            return
+        case .integralLower(let id):
+            cursor = CursorPath(slot: .integralIntegrand(id), index: 0)
+            return
+        case .summationLower(let id):
+            cursor = CursorPath(slot: .summationExpr(id), index: 0)
+            return
+        default:
+            break
+        }
         guard let parentInfo = findParentSlot(of: cursor.slot, in: root) else { return }
         cursor = CursorPath(slot: parentInfo.parentSlot, index: parentInfo.nodeIndexInParent + 1)
     }
 
     private mutating func exitSlotLeft() {
+        switch cursor.slot {
+        case .radicalRadicand(let id):
+            if let parentInfo = findParentSlot(of: cursor.slot, in: root) {
+                let parentNodes = getNodes(in: parentInfo.parentSlot)
+                if parentInfo.nodeIndexInParent < parentNodes.count,
+                   case .radical(_, let indexOpt, _) = parentNodes[parentInfo.nodeIndexInParent],
+                   indexOpt != nil {
+                    let idxNodes = getNodes(in: .radicalIndex(id))
+                    cursor = CursorPath(slot: .radicalIndex(id), index: idxNodes.count)
+                    return
+                }
+            }
+        case .logArg(let id):
+            let baseNodes = getNodes(in: .logBase(id))
+            cursor = CursorPath(slot: .logBase(id), index: baseNodes.count)
+            return
+        case .integralIntegrand(let id):
+            let lowNodes = getNodes(in: .integralLower(id))
+            cursor = CursorPath(slot: .integralLower(id), index: lowNodes.count)
+            return
+        case .summationExpr(let id):
+            let lowNodes = getNodes(in: .summationLower(id))
+            cursor = CursorPath(slot: .summationLower(id), index: lowNodes.count)
+            return
+        default:
+            break
+        }
         guard let parentInfo = findParentSlot(of: cursor.slot, in: root) else { return }
         cursor = CursorPath(slot: parentInfo.parentSlot, index: parentInfo.nodeIndexInParent)
     }
