@@ -3,469 +3,715 @@ import SwiftUI
 import UIKit
 #endif
 
-// MARK: - Visual tokens
-//
-// Every colour and every font the calculator rides on is declared here.
-// Views consume them by name; no literal colour or font past this block.
+// MARK: - Visual Tokens (Casio fx-991ES PLUS 2nd Edition)
 
-private enum C {
-    // Surfaces — warm charcoal, deepest at the bottom.
-    static let bg = Color(red: 0.071, green: 0.063, blue: 0.059)
-    static let bgDeep = Color(red: 0.043, green: 0.039, blue: 0.036)
+private enum CasioTheme {
+    // Housing / Chassis
+    static let chassis = Color(red: 0.10, green: 0.11, blue: 0.12)
+    static let chassisBezel = Color(red: 0.15, green: 0.16, blue: 0.17)
+    static let solarCell = Color(red: 0.22, green: 0.15, blue: 0.13)
+    static let solarGrid = Color.white.opacity(0.12)
 
-    // Key fills, three roles.
-    static let keyDigit = Color(red: 0.161, green: 0.141, blue: 0.129)
-    static let keyUtil = Color(red: 0.302, green: 0.271, blue: 0.243)
-    static let keyFunc = Color(red: 0.106, green: 0.092, blue: 0.084)
-    static let accent = Color(red: 1.0, green: 0.624, blue: 0.039)
-    static let accentDeep = Color(red: 0.898, green: 0.490, blue: 0.0)
+    // LCD Display
+    static let lcdBackground = Color(red: 0.54, green: 0.61, blue: 0.49)
+    static let lcdBezel = Color(red: 0.08, green: 0.09, blue: 0.10)
+    static let lcdTextActive = Color(red: 0.10, green: 0.14, blue: 0.10)
+    static let lcdTextDim = Color(red: 0.10, green: 0.14, blue: 0.10).opacity(0.18)
 
-    // Inks.
-    static let inkPrimary = Color.white
-    static let inkRail = Color(red: 0.737, green: 0.706, blue: 0.667)
-    static let inkSecondary = Color(red: 0.635, green: 0.598, blue: 0.557)
-    static let inkOnAccent = Color(red: 0.129, green: 0.059, blue: 0.0)
-    static let errorInk = Color(red: 1.0, green: 0.482, blue: 0.353)
+    // Key Fills
+    static let keyStandard = Color(red: 0.18, green: 0.19, blue: 0.20)
+    static let keyStandardBevel = Color.white.opacity(0.08)
+    static let keyDelAc = Color(red: 0.44, green: 0.66, blue: 0.22)
+    static let keyReplay = Color(red: 0.45, green: 0.47, blue: 0.50)
 
-    // Hairline edge on keys.
-    static let edge = Color.white.opacity(0.07)
-}
-
-private enum F {
-    static let display = Font.system(size: 64, weight: .light, design: .rounded).monospacedDigit()
-    static let echo = Font.system(size: 15, weight: .medium).monospacedDigit()
-    static let mode = Font.system(size: 13, weight: .semibold)
-    static func mainKey(_ size: CGFloat) -> Font { .system(size: size, weight: .medium) }
-    static func railKey(_ size: CGFloat) -> Font { .system(size: size, weight: .regular) }
+    // Secondary / Modifier Inks
+    static let inkShift = Color(red: 0.98, green: 0.78, blue: 0.18) // Bright Yellow
+    static let inkAlpha = Color(red: 0.92, green: 0.28, blue: 0.42) // Magenta/Red
+    static let inkWhite = Color.white
+    static let inkSilver = Color(red: 0.75, green: 0.77, blue: 0.80)
 }
 
 // MARK: - Haptics
 
-private enum Haptics {
+private enum CasioHaptics {
     #if canImport(UIKit)
     @MainActor
     static func tap() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
-
     @MainActor
-    static func settle() {
+    static func firm() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
     #else
-    @MainActor
-    static func tap() {}
-
-    @MainActor
-    static func settle() {}
+    @MainActor static func tap() {}
+    @MainActor static func firm() {}
     #endif
 }
 
-// MARK: - Keys
-
-enum CalcKey {
-    case digit(String)
-    case operation(String, String, (Double, Double) -> Double) // symbol, display, operator
-    case unary(String, (Double) -> Double)
-    case constant(Double)
-    case toggleSign
-    case percent
-    case clearAll
-    case angleMode
-    case equals
-
-    func perform(on engine: CalculatorEngine) {
-        switch self {
-        case .digit(let d): engine.digit(d)
-        case .operation(let symbol, _, let op): engine.setBinary(symbol, op)
-        case .unary(_, let f): engine.applyUnary(f)
-        case .constant(let v): engine.setConstant(v)
-        case .toggleSign: engine.negate()
-        case .percent: engine.percent()
-        case .clearAll: engine.clearAll()
-        case .angleMode: engine.toggleAngleMode()
-        case .equals: engine.equals()
-        }
-    }
-}
-
-// Swift cannot synthesise Hashable across closure payloads, so equality and
-// hashing are keyed by role: what a key is and does, not which closure it holds.
-extension CalcKey: Hashable {
-    static func == (lhs: CalcKey, rhs: CalcKey) -> Bool {
-        switch (lhs, rhs) {
-        case (.digit(let a), .digit(let b)):
-            return a == b
-        case (.operation(let a, _, _), .operation(let b, _, _)):
-            return a == b
-        case (.unary(let a, _), .unary(let b, _)):
-            return a == b
-        case (.constant(let a), .constant(let b)):
-            return a == b
-        case (.toggleSign, .toggleSign), (.percent, .percent),
-             (.clearAll, .clearAll), (.angleMode, .angleMode), (.equals, .equals):
-            return true
-        default:
-            return false
-        }
-    }
-
-    func hash(into hasher: inout Hasher) {
-        switch self {
-        case .digit(let d):
-            hasher.combine(0); hasher.combine(d)
-        case .operation(let symbol, _, _):
-            hasher.combine(1); hasher.combine(symbol)
-        case .unary(let label, _):
-            hasher.combine(2); hasher.combine(label)
-        case .constant(let v):
-            hasher.combine(3); hasher.combine(v)
-        case .toggleSign:
-            hasher.combine(4)
-        case .percent:
-            hasher.combine(5)
-        case .clearAll:
-            hasher.combine(6)
-        case .angleMode:
-            hasher.combine(7)
-        case .equals:
-            hasher.combine(8)
-        }
-    }
-}
-
-// MARK: - Content view
+// MARK: - Content View
 
 struct ContentView: View {
     @StateObject private var engine = CalculatorEngine()
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    // Settle spring when a pending calculation resolves into a value.
-    @State private var landScale: CGFloat = 1
-    @State private var hadPending = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            displayTray
-            Spacer(minLength: 8)
-            pads
+        ZStack {
+            CasioTheme.chassis
+                .ignoresSafeArea()
+
+            VStack(spacing: 8) {
+                // Header (Branding & Solar Cell)
+                casioHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+
+                // LCD Screen
+                casioScreen
+                    .padding(.horizontal, 14)
+
+                Spacer(minLength: 4)
+
+                // Keypad Matrix
+                casioKeypad
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
+            .frame(maxWidth: 440)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 10)
-        .frame(maxWidth: 500)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [C.bg, C.bgDeep]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
         .preferredColorScheme(.dark)
     }
 
-    // MARK: Display — the signature
+    // MARK: - Header View
 
-    private var displayTray: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(engine.radiansMode ? "rad" : "deg")
-                    .font(F.mode)
-                    .foregroundColor(C.inkSecondary)
-                    .accessibilityLabel(
-                        Text("Angle mode \(engine.radiansMode ? "radians" : "degrees")")
+    private var casioHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("CASIO")
+                    .font(.system(size: 20, weight: .black, design: .serif))
+                    .tracking(1.5)
+                    .foregroundColor(CasioTheme.inkWhite)
+
+                HStack(spacing: 4) {
+                    Text("fx-991ES PLUS")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.inkSilver)
+                    Text("2nd edition")
+                        .font(.system(size: 9, weight: .semibold, design: .default))
+                        .foregroundColor(CasioTheme.inkSilver.opacity(0.8))
+                }
+
+                Text("NATURAL-V.P.A.M.")
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .italic()
+                    .foregroundColor(CasioTheme.inkSilver.opacity(0.7))
+            }
+
+            Spacer()
+
+            // Solar Cell Simulator
+            solarPanel
+        }
+    }
+
+    private var solarPanel: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(
+                    LinearGradient(
+                        colors: [CasioTheme.solarCell, Color(red: 0.16, green: 0.10, blue: 0.08)],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                Spacer()
-                Text(engine.preview)
-                    .font(F.echo)
-                    .foregroundColor(C.inkSecondary)
-                    .lineLimit(1)
-                    .opacity(engine.preview.isEmpty ? 0 : 1)
-                    .accessibilityLabel(Text("Pending calculation \(engine.preview)"))
-            }
-            Text(engine.display)
-                .font(F.display)
-                .foregroundColor(engine.display == "Error" ? C.errorInk : C.inkPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.28)
-                .scaleEffect(landScale)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .onChange(of: engine.preview) { _ in
-            if engine.preview.isEmpty {
-                guard hadPending else { return }
-                hadPending = false
-                guard !reduceMotion else { return }
-                Haptics.settle()
-                landScale = 0.92
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
-                    landScale = 1
-                }
-            } else {
-                hadPending = true
-            }
-        }
-    }
-
-    // MARK: Pads — quiet rail, dominant main pad, bottom-flush
-
-    private var pads: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            scientificPad
-            mainPad
-        }
-    }
-
-    // MARK: Key fills by role
-
-    private enum KeyFill {
-        static let digit = AnyShapeStyle(C.keyDigit)
-        static let util = AnyShapeStyle(C.keyUtil)
-        static let rail = AnyShapeStyle(C.keyFunc)
-        static let accent = AnyShapeStyle(
-            LinearGradient(
-                gradient: Gradient(colors: [C.accent, C.accentDeep]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-
-    private func keyButton(
-        _ key: CalcKey,
-        fill: AnyShapeStyle,
-        ink: Color,
-        labelFont: Font,
-        height: CGFloat = 58,
-        radius: CGFloat = 16
-    ) -> some View {
-        Button {
-            if key.isEquals {
-                Haptics.settle()
-            } else {
-                Haptics.tap()
-            }
-            key.perform(on: engine)
-        } label: {
-            keyLabel(key)
-                .font(labelFont)
-                .foregroundColor(ink)
-                .frame(maxWidth: .infinity, minHeight: height)
-                .background(
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .fill(fill)
                 )
+                .frame(width: 88, height: 26)
                 .overlay(
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(C.edge, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(CasioTheme.chassisBezel, lineWidth: 1.5)
                 )
-                .accessibilityLabel(key, on: engine)
-        }
-        .buttonStyle(KeyButtonStyle())
-    }
 
-    @ViewBuilder
-    private func keyLabel(_ key: CalcKey) -> some View {
-        switch key {
-        case .toggleSign:
-            Image(systemName: "plus.forwardslash.minus")
-        case .clearAll:
-            Text("AC")
-        case .constant(Double.pi):
-            Text("π")
-        case .constant:
-            Text("e")
-        case .angleMode:
-            Text(engine.radiansMode ? "DEG" : "RAD")
-        default:
-            Text(key.displayText)
+            HStack(spacing: 18) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Rectangle()
+                        .fill(CasioTheme.solarGrid)
+                        .frame(width: 1, height: 22)
+                }
+            }
         }
     }
 
-    // MARK: Scientific rail — recessed, smaller, quiet, bottom-flush
+    // MARK: - LCD Display Screen
 
-    private var scientificPad: some View {
-        let functionKeys: [[CalcKey]] = [
-            [.unary("sin", { self.engine.sinFunction($0) }),
-             .unary("cos", { self.engine.cosFunction($0) }),
-             .unary("tan", { self.engine.tanFunction($0) })],
-            [.unary("ln", engine.lnFunction),
-             .unary("log", engine.logFunction),
-             .unary("√", engine.sqrtFunction)],
-            [.unary("x²", engine.squareFunction),
-             .unary("1/x", engine.reciprocalFunction),
-             .unary("x!", engine.factorialFunction)],
-            [.constant(Double.pi),
-             .constant(M_E),
-             .angleMode],
-        ]
-        return VStack(spacing: 10) {
-            ForEach(0..<functionKeys.count, id: \.self) { row in
-                HStack(spacing: 10) {
-                    ForEach(functionKeys[row], id: \.self) { key in
-                        keyButton(
-                            key,
-                            fill: KeyFill.rail,
-                            ink: C.inkRail,
-                            labelFont: F.railKey(15),
-                            height: 52,
-                            radius: 13
-                        )
+    private var casioScreen: some View {
+        ZStack {
+            // LCD Glass Rim
+            RoundedRectangle(cornerRadius: 10)
+                .fill(CasioTheme.lcdBezel)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(CasioTheme.chassisBezel, lineWidth: 2)
+                )
+
+            // Inner LCD
+            RoundedRectangle(cornerRadius: 6)
+                .fill(CasioTheme.lcdBackground)
+                .padding(6)
+                .overlay(
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Annunciator Status Bar
+                        annunciatorBar
+
+                        // LCD Content (Menu or Expression/Result)
+                        if engine.menuState != .none {
+                            menuDisplayView
+                        } else {
+                            expressionDisplayView
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                )
+        }
+        .frame(height: 122)
+    }
+
+    // MARK: - Annunciator Bar
+
+    private var annunciatorBar: some View {
+        HStack(spacing: 7) {
+            annunciator("S", active: engine.shiftActive)
+            annunciator("A", active: engine.alphaActive)
+            annunciator("M", active: engine.hasMemory)
+            annunciator("STO", active: engine.shiftActive)
+            Spacer()
+            annunciator("D", active: engine.angleUnit == .deg)
+            annunciator("R", active: engine.angleUnit == .rad)
+            annunciator("G", active: engine.angleUnit == .gra)
+            annunciator("Fix", active: isFixFormat)
+            annunciator("Sci", active: isSciFormat)
+            annunciator("Math", active: true)
+            annunciator("▲", active: false)
+            annunciator("▼", active: false)
+        }
+        .frame(height: 12)
+    }
+
+    private func annunciator(_ text: String, active: Bool) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .foregroundColor(active ? CasioTheme.lcdTextActive : CasioTheme.lcdTextDim)
+    }
+
+    private var isFixFormat: Bool {
+        if case .fix = engine.displayFormat { return true }
+        return false
+    }
+
+    private var isSciFormat: Bool {
+        if case .sci = engine.displayFormat { return true }
+        return false
+    }
+
+    // MARK: - Expression & Result Display
+
+    private var expressionDisplayView: some View {
+        VStack(spacing: 2) {
+            // Expression Line (Top, Left-aligned, with Cursor)
+            HStack(spacing: 0) {
+                Text(renderedExpression)
+                    .font(.system(size: 17, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .frame(height: 26)
+
+            Spacer()
+
+            // Result / Error Line (Bottom, Right-aligned)
+            HStack {
+                if engine.isError {
+                    Text(engine.result)
+                        .font(.system(size: 20, weight: .heavy, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                    Spacer()
+                    Text("[AC]:Cancel")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                } else {
+                    Spacer()
+                    Text(engine.result)
+                        .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.3)
+                }
+            }
+            .frame(height: 40)
+        }
+    }
+
+    private var renderedExpression: String {
+        let expr = engine.expression
+        let pos = engine.cursorPosition
+        let chars = Array(expr)
+        if chars.isEmpty {
+            return "_"
+        }
+        let safePos = min(max(0, pos), chars.count)
+        let prefix = String(chars[0..<safePos])
+        let suffix = String(chars[safePos..<chars.count])
+        return prefix + "_" + suffix
+    }
+
+    // MARK: - Menu Display View
+
+    private var menuDisplayView: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            switch engine.menuState {
+            case .modeMenu:
+                Text("1:COMP    2:STAT")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("3:TABLE   4:EQN")
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .setupMenu:
+                Text("1:MthIO 2:LineIO 3:Deg")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("4:Rad   5:Gra    6:Fix")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("7:Sci   8:Norm")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .fixPrompt:
+                Text("Fix 0 ~ 9 ?")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .sciPrompt:
+                Text("Sci 0 ~ 9 ?")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .none:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: - Keypad Matrix
+
+    private var casioKeypad: some View {
+        VStack(spacing: 6) {
+            // Control Tier (SHIFT, ALPHA, Replay D-Pad, MODE, ON)
+            controlTier
+                .padding(.bottom, 2)
+
+            // Scientific Function Grid (3 Rows)
+            scientificTier
+
+            // Main Numeric & Operator Pad (4 Rows)
+            mainNumberPad
+        }
+    }
+
+    // MARK: - Control Tier
+
+    private var controlTier: some View {
+        HStack(spacing: 12) {
+            // Left: SHIFT and ALPHA
+            VStack(spacing: 5) {
+                casioButton(label: "SHIFT", shiftLabel: "", alphaLabel: "", ink: CasioTheme.inkShift, height: 26) {
+                    CasioHaptics.tap()
+                    engine.toggleShift()
+                }
+                casioButton(label: "ALPHA", shiftLabel: "", alphaLabel: "", ink: CasioTheme.inkAlpha, height: 26) {
+                    CasioHaptics.tap()
+                    engine.toggleAlpha()
+                }
+            }
+            .frame(width: 60)
+
+            Spacer()
+
+            // Center: Replay D-Pad
+            replayPad
+
+            Spacer()
+
+            // Right: MODE SETUP and ON
+            VStack(spacing: 5) {
+                casioButton(label: "MODE", shiftLabel: "SETUP", alphaLabel: "", height: 26) {
+                    CasioHaptics.tap()
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.openSetupMenu()
+                    } else {
+                        engine.openModeMenu()
+                    }
+                }
+                casioButton(label: "ON", shiftLabel: "", alphaLabel: "", height: 26) {
+                    CasioHaptics.firm()
+                    engine.turnOn()
+                }
+            }
+            .frame(width: 60)
+        }
+    }
+
+    // MARK: - Replay D-Pad
+
+    private var replayPad: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [CasioTheme.keyReplay.opacity(0.9), CasioTheme.chassisBezel],
+                        center: .center,
+                        startRadius: 4,
+                        endRadius: 42
+                    )
+                )
+                .frame(width: 82, height: 82)
+                .overlay(
+                    Circle().stroke(CasioTheme.chassisBezel, lineWidth: 2)
+                )
+
+            Text("REPLAY")
+                .font(.system(size: 8, weight: .bold, design: .default))
+                .foregroundColor(CasioTheme.inkWhite.opacity(0.6))
+
+            // Directional Buttons
+            VStack {
+                Button {
+                    CasioHaptics.tap()
+                } label: {
+                    Image(systemName: "triangle.fill")
+                        .font(.system(size: 8))
+                        .foregroundColor(CasioTheme.inkWhite)
+                        .frame(width: 32, height: 22)
+                }
+                Spacer()
+                Button {
+                    CasioHaptics.tap()
+                } label: {
+                    Image(systemName: "triangle.fill")
+                        .rotationEffect(.degrees(180))
+                        .font(.system(size: 8))
+                        .foregroundColor(CasioTheme.inkWhite)
+                        .frame(width: 32, height: 22)
+                }
+            }
+            .frame(height: 78)
+
+            HStack {
+                Button {
+                    CasioHaptics.tap()
+                    engine.moveCursorLeft()
+                } label: {
+                    Image(systemName: "triangle.fill")
+                        .rotationEffect(.degrees(-90))
+                        .font(.system(size: 8))
+                        .foregroundColor(CasioTheme.inkWhite)
+                        .frame(width: 22, height: 32)
+                }
+                Spacer()
+                Button {
+                    CasioHaptics.tap()
+                    engine.moveCursorRight()
+                } label: {
+                    Image(systemName: "triangle.fill")
+                        .rotationEffect(.degrees(90))
+                        .font(.system(size: 8))
+                        .foregroundColor(CasioTheme.inkWhite)
+                        .frame(width: 22, height: 32)
+                }
+            }
+            .frame(width: 78)
+        }
+    }
+
+    // MARK: - Scientific Function Grid
+
+    private var scientificTier: some View {
+        VStack(spacing: 5) {
+            // Function Row 1
+            HStack(spacing: 6) {
+                funcKey("■/□", shift: "∛", alpha: "") {
+                    engine.insert("÷")
+                }
+                funcKey("√", shift: "∛", alpha: "") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("∛(")
+                    } else {
+                        engine.insert("√(")
+                    }
+                }
+                funcKey("x²", shift: "x³", alpha: "") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("³")
+                    } else {
+                        engine.insert("²")
+                    }
+                }
+                funcKey("x^■", shift: "ʸ√x", alpha: "") {
+                    engine.insert("^(")
+                }
+                funcKey("log", shift: "10^■", alpha: "") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("10^(")
+                    } else {
+                        engine.insert("log(")
+                    }
+                }
+                funcKey("ln", shift: "e^■", alpha: "") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("e^(")
+                    } else {
+                        engine.insert("ln(")
+                    }
+                }
+            }
+
+            // Function Row 2
+            HStack(spacing: 6) {
+                funcKey("(-)", shift: "", alpha: "A") {
+                    if engine.alphaActive { engine.alphaActive = false }
+                    engine.insert("-")
+                }
+                funcKey("° ' \"", shift: "←", alpha: "B") {
+                    if engine.alphaActive { engine.alphaActive = false }
+                    engine.insert("°")
+                }
+                funcKey("hyp", shift: "", alpha: "C") {
+                    if engine.alphaActive { engine.alphaActive = false }
+                }
+                funcKey("sin", shift: "sin⁻¹", alpha: "D") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("sin⁻¹(")
+                    } else {
+                        engine.insert("sin(")
+                    }
+                }
+                funcKey("cos", shift: "cos⁻¹", alpha: "E") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("cos⁻¹(")
+                    } else {
+                        engine.insert("cos(")
+                    }
+                }
+                funcKey("tan", shift: "tan⁻¹", alpha: "F") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("tan⁻¹(")
+                    } else {
+                        engine.insert("tan(")
+                    }
+                }
+            }
+
+            // Function Row 3
+            HStack(spacing: 6) {
+                funcKey("RCL", shift: "STO", alpha: "") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.storeMemory()
+                    } else {
+                        engine.recallMemory()
+                    }
+                }
+                funcKey("ENG", shift: "←", alpha: "") {
+                    engine.cycleEng()
+                }
+                funcKey("(", shift: "%", alpha: "X") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("%")
+                    } else {
+                        engine.insert("(")
+                    }
+                }
+                funcKey(")", shift: ",", alpha: "Y") {
+                    engine.insert(")")
+                }
+                funcKey("S<=>D", shift: "a b/c", alpha: "") {
+                    engine.toggleSD()
+                }
+                funcKey("M+", shift: "M-", alpha: "M") {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.subtractMemory()
+                    } else {
+                        engine.addMemory()
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity)
     }
 
-    // MARK: Main pad — digits, utilities, accent operators
-
-    private var mainPad: some View {
-        let op = { (symbol: String, display: String, f: @escaping (Double, Double) -> Double) in
-            CalcKey.operation(symbol, display, f)
+    private func funcKey(_ label: String, shift: String, alpha: String, action: @escaping () -> Void) -> some View {
+        casioButton(label: label, shiftLabel: shift, alphaLabel: alpha, height: 29) {
+            CasioHaptics.tap()
+            action()
         }
-        let rows: [[CalcKey]] = [
-            [.clearAll, .toggleSign, .percent, op("÷", "÷", *)],
-            [.digit("7"), .digit("8"), .digit("9"), op("×", "×", *)],
-            [.digit("4"), .digit("5"), .digit("6"), op("−", "−", -)],
-            [.digit("1"), .digit("2"), .digit("3"), op("+", "+", +)],
-        ]
-        return VStack(spacing: 10) {
-            ForEach(0..<rows.count, id: \.self) { row in
-                HStack(spacing: 10) {
-                    ForEach(Array(rows[row].enumerated()), id: \.element) { pair in
-                        roleKey(pair.element, row: row, column: pair.offset)
-                    }
+    }
+
+    // MARK: - Main Number Pad
+
+    private var mainNumberPad: some View {
+        VStack(spacing: 5) {
+            // Row 1: 7, 8, 9, DEL, AC
+            HStack(spacing: 6) {
+                digitKey("7", shift: "CONST")
+                digitKey("8", shift: "CONV")
+                digitKey("9", shift: "CLR")
+                casioButton(label: "DEL", shiftLabel: "INS", alphaLabel: "", fill: CasioTheme.keyDelAc, height: 36) {
+                    CasioHaptics.tap()
+                    engine.delete()
+                }
+                casioButton(label: "AC", shiftLabel: "OFF", alphaLabel: "", fill: CasioTheme.keyDelAc, height: 36) {
+                    CasioHaptics.firm()
+                    engine.clearAll()
                 }
             }
-            HStack(spacing: 10) {
-                roleKey(.digit("0"), row: 4, column: 0)
-                roleKey(.digit("."), row: 4, column: 1)
-                roleKey(.equals, row: 4, column: 2)
+
+            // Row 2: 4, 5, 6, ×, ÷
+            HStack(spacing: 6) {
+                digitKey("4", shift: "MATRIX")
+                digitKey("5", shift: "VECTOR")
+                digitKey("6", shift: "")
+                opKey("×", shift: "nPr")
+                opKey("÷", shift: "nCr")
+            }
+
+            // Row 3: 1, 2, 3, +, −
+            HStack(spacing: 6) {
+                digitKey("1", shift: "STAT")
+                digitKey("2", shift: "CMPLX")
+                digitKey("3", shift: "BASE")
+                opKey("+", shift: "Pol")
+                opKey("−", shift: "Rec")
+            }
+
+            // Row 4: 0, ., ×10^x, Ans, =
+            HStack(spacing: 6) {
+                digitKey("0", shift: "Rnd")
+                digitKey(".", shift: "Ran#", alpha: "RanInt")
+                casioButton(label: "×10^x", shiftLabel: "π", alphaLabel: "e", height: 36) {
+                    CasioHaptics.tap()
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.insert("π")
+                    } else if engine.alphaActive {
+                        engine.alphaActive = false
+                        engine.insert("e")
+                    } else {
+                        engine.insert("×10^")
+                    }
+                }
+                casioButton(label: "Ans", shiftLabel: "DRG▶", alphaLabel: "", height: 36) {
+                    CasioHaptics.tap()
+                    engine.insert("Ans")
+                }
+                casioButton(label: "=", shiftLabel: "", alphaLabel: "", height: 36) {
+                    CasioHaptics.firm()
+                    engine.evaluate()
+                }
             }
         }
-        .frame(maxWidth: .infinity)
     }
 
-    /// Roles by position: the last column is accent, the top row is the
-    /// utility tier, equals keeps the accent, everything else is a digit.
-    @ViewBuilder
-    private func roleKey(_ key: CalcKey, row: Int, column: Int) -> some View {
-        if column == 3 || key.isEquals {
-            keyButton(
-                key,
-                fill: KeyFill.accent,
-                ink: C.inkOnAccent,
-                labelFont: F.mainKey(24)
-            )
-        } else if row == 0 {
-            keyButton(
-                key,
-                fill: KeyFill.util,
-                ink: key.isClearAll ? C.accent : C.inkPrimary,
-                labelFont: F.mainKey(key.isClearAll ? 19 : 21)
-            )
-        } else {
-            keyButton(
-                key,
-                fill: KeyFill.digit,
-                ink: C.inkPrimary,
-                labelFont: F.mainKey(23)
-            )
+    private func digitKey(_ digit: String, shift: String = "", alpha: String = "") -> some View {
+        casioButton(label: digit, shiftLabel: shift, alphaLabel: alpha, labelFont: .system(size: 20, weight: .semibold), height: 36) {
+            CasioHaptics.tap()
+            if engine.menuState != .none, let n = Int(digit) {
+                engine.selectMenuOption(n)
+            } else if engine.shiftActive && shift == "π" {
+                engine.shiftActive = false
+                engine.insert("π")
+            } else {
+                engine.insert(digit)
+            }
+        }
+    }
+
+    private func opKey(_ symbol: String, shift: String = "") -> some View {
+        casioButton(label: symbol, shiftLabel: shift, alphaLabel: "", labelFont: .system(size: 19, weight: .semibold), height: 36) {
+            CasioHaptics.tap()
+            engine.insert(symbol)
+        }
+    }
+
+    // MARK: - Reusable Casio Button Component
+
+    private func casioButton(
+        label: String,
+        shiftLabel: String = "",
+        alphaLabel: String = "",
+        fill: Color = CasioTheme.keyStandard,
+        ink: Color = CasioTheme.inkWhite,
+        labelFont: Font = .system(size: 13, weight: .semibold),
+        height: CGFloat = 32,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 1) {
+            // Secondary labels above key
+            HStack {
+                if !shiftLabel.isEmpty {
+                    Text(shiftLabel)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(CasioTheme.inkShift)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if !alphaLabel.isEmpty {
+                    Text(alphaLabel)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(CasioTheme.inkAlpha)
+                        .lineLimit(1)
+                }
+            }
+            .frame(height: 10)
+            .padding(.horizontal, 2)
+
+            // Physical Button Cap
+            Button(action: action) {
+                Text(label)
+                    .font(labelFont)
+                    .foregroundColor(ink)
+                    .frame(maxWidth: .infinity, maxHeight: height)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(fill)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(CasioTheme.keyStandardBevel, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(CasioButtonStyle())
         }
     }
 }
 
-// MARK: - Labels
+// MARK: - Button Press Style
 
-extension CalcKey {
-    /// On-key text; symbol keys keep their glyphs.
-    var displayText: String {
-        switch self {
-        case .digit(let d): return d
-        case .operation(let symbol, let display, _): return display.isEmpty ? symbol : display
-        case .unary(let label, _): return label
-        case .percent: return "%"
-        case .clearAll: return "AC"
-        case .equals: return "="
-        default: return ""
-        }
-    }
-
-    var isClearAll: Bool {
-        if case .clearAll = self { return true }
-        return false
-    }
-
-    var isEquals: Bool {
-        if case .equals = self { return true }
-        return false
-    }
-}
-
-extension View {
-    /// VoiceOver sentence for each key.
-    @ViewBuilder
-    func accessibilityLabel(_ key: CalcKey, on engine: CalculatorEngine) -> some View {
-        switch key {
-        case .operation(let symbol, _, _):
-            accessibilityLabel(Text(Self.voiceOverName(symbol)))
-        case .unary(let glyph, _):
-            accessibilityLabel(Text(Self.voiceOverUnary(glyph)))
-        case .digit(let d):
-            accessibilityLabel(Text(d == "." ? "decimal point" : "digit \(d)"))
-        case .constant(Double.pi):
-            accessibilityLabel(Text("pi"))
-        case .constant:
-            accessibilityLabel(Text("Euler's number"))
-        case .toggleSign:
-            accessibilityLabel(Text("toggle sign"))
-        case .percent:
-            accessibilityLabel(Text("percent"))
-        case .clearAll:
-            accessibilityLabel(Text("all clear"))
-        case .angleMode:
-            accessibilityLabel(Text(engine.radiansMode ? "switch to degrees" : "switch to radians"))
-        case .equals:
-            accessibilityLabel(Text("equals"))
-        }
-    }
-
-    private static func voiceOverName(_ symbol: String) -> String {
-        switch symbol {
-        case "÷": return "divide"
-        case "×": return "multiply"
-        case "−": return "minus"
-        case "+": return "plus"
-        default: return symbol
-        }
-    }
-
-    private static func voiceOverUnary(_ glyph: String) -> String {
-        switch glyph {
-        case "sin": return "sine"
-        case "cos": return "cosine"
-        case "tan": return "tangent"
-        case "ln": return "natural logarithm"
-        case "log": return "common logarithm"
-        case "√": return "square root"
-        case "x²": return "squared"
-        case "1/x": return "reciprocal"
-        case "x!": return "factorial"
-        default: return glyph
-        }
-    }
-}
-
-// MARK: - Button style
-
-private struct KeyButtonStyle: ButtonStyle {
+private struct CasioButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .opacity(configuration.isPressed ? 0.78 : 1)
-            .animation(.spring(response: 0.24, dampingFraction: 0.68), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.93 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
