@@ -321,14 +321,26 @@ public struct MathASTManager: Sendable {
     public mutating func insertText(_ text: String) {
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
+        var merged = false
         updateSlot(slot: targetSlot) { nodes in
             var updated = nodes
             let safeIdx = min(max(0, targetIndex), updated.count)
+            if safeIdx > 0, case .text(let id, let prevContent) = updated[safeIdx - 1] {
+                let isPrevDigit = prevContent.allSatisfy { ($0 >= "0" && $0 <= "9") || $0 == "." }
+                let isCurDigit = text.allSatisfy { ($0 >= "0" && $0 <= "9") || $0 == "." }
+                if isPrevDigit && isCurDigit {
+                    updated[safeIdx - 1] = .text(id: id, content: prevContent + text)
+                    merged = true
+                    return updated
+                }
+            }
             let newNode = MathNode.text(id: UUID(), content: text)
             updated.insert(newNode, at: safeIdx)
             return updated
         }
-        cursor.index += 1
+        if !merged {
+            cursor.index += 1
+        }
     }
 
     public mutating func insertFraction() {

@@ -331,3 +331,266 @@ public struct ExactValue: Equatable, Sendable {
         return nil
     }
 }
+
+// MARK: - Exact Evaluator for AST Nodes
+
+public enum ExactEvaluator {
+    private enum ExactToken: Equatable {
+        case val(ExactValue)
+        case binaryOp(String, Int) // op, precedence
+        case openParen
+        case closeParen
+    }
+
+    public static func evaluate(nodes: [MathNode], angleUnit: AngleUnit = .deg) -> ExactValue? {
+        guard !nodes.isEmpty else { return nil }
+        var tokens: [ExactToken] = []
+
+        var i = 0
+        while i < nodes.count {
+            let node = nodes[i]
+            switch node {
+            case .text(_, let content):
+                let trimmed = content.trimmingCharacters(in: .whitespaces)
+                if trimmed == "+" {
+                    tokens.append(.binaryOp("+", 1))
+                } else if trimmed == "-" || trimmed == "−" {
+                    // Check if unary negation
+                    var isUnary = false
+                    if let last = tokens.last {
+                        switch last {
+                        case .binaryOp, .openParen: isUnary = true
+                        default: isUnary = false
+                        }
+                    } else {
+                        isUnary = true
+                    }
+                    if isUnary {
+                        tokens.append(.val(.zero))
+                        tokens.append(.binaryOp("-", 1))
+                    } else {
+                        tokens.append(.binaryOp("-", 1))
+                    }
+                } else if trimmed == "×" || trimmed == "*" {
+                    tokens.append(.binaryOp("×", 2))
+                } else if trimmed == "÷" || trimmed == "/" {
+                    tokens.append(.binaryOp("÷", 2))
+                } else if trimmed == "π" {
+                    if let last = tokens.last, canImplicitMultiply(last) {
+                        tokens.append(.binaryOp("×", 3)) // Casio precedence 3 for implicit
+                    }
+                    tokens.append(.val(.piMultiple(Rational(1, 1))))
+                } else if trimmed.allSatisfy({ ($0 >= "0" && $0 <= "9") || $0 == "." }) {
+                    var numStr = trimmed
+                    while i + 1 < nodes.count {
+                        if case .text(_, let nextContent) = nodes[i + 1] {
+                            let nextTrimmed = nextContent.trimmingCharacters(in: .whitespaces)
+                            if !nextTrimmed.isEmpty && nextTrimmed.allSatisfy({ ($0 >= "0" && $0 <= "9") || $0 == "." }) {
+                                numStr.append(nextTrimmed)
+                                i += 1
+                                continue
+                            }
+                        }
+                        break
+                    }
+                    if let intVal = Int64(numStr) {
+                        if let last = tokens.last, canImplicitMultiply(last) {
+                            tokens.append(.binaryOp("×", 3))
+                        }
+                        tokens.append(.val(.rational(Rational(intVal, 1))))
+                    } else if let dVal = Double(numStr), let frac = Fraction.fromDouble(dVal) {
+                        if let last = tokens.last, canImplicitMultiply(last) {
+                            tokens.append(.binaryOp("×", 3))
+                        }
+                        tokens.append(.val(.rational(Rational(frac.num, frac.den))))
+                    } else {
+                        return nil
+                    }
+                } else {
+                    return nil
+                }
+
+            case .fraction(_, let num, let den):
+                guard let numVal = evaluate(nodes: num, angleUnit: angleUnit),
+                      let denVal = evaluate(nodes: den, angleUnit: angleUnit),
+                      let res = numVal / denVal else {
+                    return nil
+                }
+                if let last = tokens.last, canImplicitMultiply(last) {
+                    tokens.append(.binaryOp("×", 3))
+                }
+                tokens.append(.val(res))
+
+            case .radical(_, let index, let radicand):
+                guard index == nil else { return nil } // square root only for exact surds
+                guard let radVal = evaluate(nodes: radicand, angleUnit: angleUnit) else { return nil }
+                // Check if radVal is a pure rational
+                if radVal.surdTerms.count == 1, let q = radVal.surdTerms[1], radVal.piCoeff.isZero, q > .zero {
+                    // sqrt(num / den) = sqrt(num * den) / den
+                    let prod = q.num * q.den
+                    let (outside, inside) = ExactValue.squareFreeFactor(prod)
+                    let coeff = Rational(outside, q.den)
+                    let res = ExactValue.surd(coeff: coeff, radicand: inside)
+                    if let last = tokens.last, canImplicitMultiply(last) {
+                        tokens.append(.binaryOp("×", 3))
+                    }
+                    tokens.append(.val(res))
+                } else {
+                    return nil
+                }
+
+            case .exponent(_, let base, let power):
+                guard let bVal = evaluate(nodes: base, angleUnit: angleUnit),
+                      let pVal = evaluate(nodes: power, angleUnit: angleUnit) else { return nil }
+                // Only integer powers supported exactly
+                guard pVal.surdTerms.count == 1, let q = pVal.surdTerms[1], pVal.piCoeff.isZero, q.den == 1 else { return nil }
+                let exp = q.num
+                if exp == 0 {
+                    tokens.append(.val(.rational(Rational(1, 1))))
+                } else if exp > 0 {
+                    var res = bVal
+                    for _ in 1..<exp {
+                        res = res * bVal
+                    }
+                    tokens.append(.val(res))
+                } else {
+                    var res = bVal
+                    for _ in 1..<abs(exp) {
+                        res = res * bVal
+                    }
+                    guard let inv = ExactValue.rational(Rational(1, 1)) / res else { return nil }
+                    tokens.append(.val(inv))
+                }
+
+            case .parens(_, let children):
+                if let last = tokens.last, canImplicitMultiply(last) {
+                    tokens.append(.binaryOp("×", 3))
+                }
+                guard let val = evaluate(nodes: children, angleUnit: angleUnit) else { return nil }
+                tokens.append(.val(val))
+
+            case .function(_, let name, let arg):
+                guard let argVal = evaluate(nodes: arg, angleUnit: angleUnit) else { return nil }
+                guard let res = evaluateExactFunction(name: name, arg: argVal, angleUnit: angleUnit) else { return nil }
+                if let last = tokens.last, canImplicitMultiply(last) {
+                    tokens.append(.binaryOp("×", 3))
+                }
+                tokens.append(.val(res))
+
+            default:
+                return nil
+            }
+            i += 1
+        }
+
+        // Shunting-Yard on exact tokens
+        return evaluateExactTokens(tokens)
+    }
+
+    private static func canImplicitMultiply(_ token: ExactToken) -> Bool {
+        switch token {
+        case .val, .closeParen: return true
+        default: return false
+        }
+    }
+
+    private static func evaluateExactFunction(name: String, arg: ExactValue, angleUnit: AngleUnit) -> ExactValue? {
+        // Evaluate special angle trigonometric values
+        guard arg.surdTerms.count == 1, let q = arg.surdTerms[1], arg.piCoeff.isZero else { return nil }
+        var deg = q.toDouble()
+        switch angleUnit {
+        case .deg: break
+        case .rad: deg = deg * 180.0 / .pi
+        case .gra: deg = deg * 180.0 / 200.0
+        }
+
+        let normDeg = Int(round(deg))
+        let sign: Int64 = normDeg < 0 ? -1 : 1
+        let absDeg = abs(normDeg) % 360
+
+        switch name {
+        case "sin":
+            if absDeg == 0 || absDeg == 180 { return .zero }
+            if absDeg == 30 { return .rational(Rational(sign * 1, 2)) }
+            if absDeg == 45 { return .surd(coeff: Rational(sign * 1, 2), radicand: 2) }
+            if absDeg == 60 { return .surd(coeff: Rational(sign * 1, 2), radicand: 3) }
+            if absDeg == 90 { return .rational(Rational(sign * 1, 1)) }
+            if absDeg == 150 { return .rational(Rational(sign * 1, 2)) }
+        case "cos":
+            if absDeg == 0 { return .rational(Rational(1, 1)) }
+            if absDeg == 30 || absDeg == 330 { return .surd(coeff: Rational(1, 2), radicand: 3) }
+            if absDeg == 45 || absDeg == 315 { return .surd(coeff: Rational(1, 2), radicand: 2) }
+            if absDeg == 60 || absDeg == 300 { return .rational(Rational(1, 2)) }
+            if absDeg == 90 || absDeg == 270 { return .zero }
+            if absDeg == 180 { return .rational(Rational(-1, 1)) }
+        case "tan":
+            if absDeg == 0 || absDeg == 180 { return .zero }
+            if absDeg == 30 { return .surd(coeff: Rational(sign * 1, 3), radicand: 3) }
+            if absDeg == 45 { return .rational(Rational(sign * 1, 1)) }
+            if absDeg == 60 { return .surd(coeff: Rational(sign * 1, 1), radicand: 3) }
+        default:
+            break
+        }
+        return nil
+    }
+
+    private static func evaluateExactTokens(_ tokens: [ExactToken]) -> ExactValue? {
+        var outputQueue: [ExactToken] = []
+        var opStack: [ExactToken] = []
+
+        for token in tokens {
+            switch token {
+            case .val:
+                outputQueue.append(token)
+            case .binaryOp(_, let prec1):
+                while let top = opStack.last {
+                    if case .binaryOp(_, let prec2) = top, prec2 >= prec1 {
+                        outputQueue.append(opStack.removeLast())
+                    } else {
+                        break
+                    }
+                }
+                opStack.append(token)
+            case .openParen:
+                opStack.append(token)
+            case .closeParen:
+                while let top = opStack.last, top != .openParen {
+                    outputQueue.append(opStack.removeLast())
+                }
+                if opStack.last == .openParen {
+                    opStack.removeLast()
+                }
+            }
+        }
+
+        while !opStack.isEmpty {
+            outputQueue.append(opStack.removeLast())
+        }
+
+        // Evaluate RPN
+        var evalStack: [ExactValue] = []
+        for token in outputQueue {
+            switch token {
+            case .val(let v):
+                evalStack.append(v)
+            case .binaryOp(let op, _):
+                guard evalStack.count >= 2 else { return nil }
+                let r = evalStack.removeLast()
+                let l = evalStack.removeLast()
+                switch op {
+                case "+": evalStack.append(l + r)
+                case "-": evalStack.append(l - r)
+                case "×": evalStack.append(l * r)
+                case "÷":
+                    guard let res = l / r else { return nil }
+                    evalStack.append(res)
+                default: return nil
+                }
+            default:
+                return nil
+            }
+        }
+
+        return evalStack.count == 1 ? evalStack[0] : nil
+    }
+}

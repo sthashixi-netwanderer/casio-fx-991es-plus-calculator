@@ -46,6 +46,23 @@ struct CasioEvaluatorTests {
         let nodes = sumSurd.toMathNodes()
         assertTrue(!nodes.isEmpty, "toMathNodes() should not be empty")
 
+        // 0.2 CalculatorEngine 2D AST Evaluation & S<=>D Toggle
+        let testEng = CalculatorEngine()
+        testEng.insertASTText("1")
+        testEng.insertASTFraction()
+        testEng.insertASTText("2")
+        testEng.moveCursorRight()
+        testEng.insertASTText("+")
+        testEng.insertASTText("1")
+        testEng.insertASTFraction()
+        testEng.insertASTText("3")
+        testEng.evaluate()
+        assertTrue(testEng.exactResult != nil, "testEng.exactResult should be set")
+        assertEqual(testEng.exactResult?.toDouble() ?? 0, 5.0 / 6.0, accuracy: 1e-6, "1/2 + 1/3 should be 5/6")
+        assertTrue(!testEng.isShowingDecimal, "Initially in MthIO, exact result should be shown")
+        testEng.toggleSD()
+        assertTrue(testEng.isShowingDecimal, "Pressing S<=>D should toggle to decimal")
+
         // 1. Arithmetic precedence
         let res1 = CasioEvaluator.evaluate("2+3×4", angleUnit: .deg)
         assertEqual(res1.value ?? 0, 14.0, "2+3×4 should be 14")
