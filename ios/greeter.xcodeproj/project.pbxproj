@@ -74,7 +74,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		"xtool:greeter" /* greeter-App */ = {
+		A1B2C3D4E5F60718293A4B5C /* greeter-App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E4552FDBF9A5D40AE0C34CE8 /* Build configuration list for PBXNativeTarget "greeter-App" */;
 			buildPhases = (
@@ -116,7 +116,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				"xtool:greeter" /* greeter-App */,
+				A1B2C3D4E5F60718293A4B5C /* greeter-App */,
 			);
 		};
 /* End PBXProject section */

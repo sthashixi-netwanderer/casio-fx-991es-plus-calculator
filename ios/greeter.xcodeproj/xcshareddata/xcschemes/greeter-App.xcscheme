@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "xtool:greeter"
+               BlueprintIdentifier = "A1B2C3D4E5F60718293A4B5C"
                BuildableName = "greeter-App.app"
                BlueprintName = "greeter-App"
                ReferencedContainer = "container:greeter.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "xtool:greeter"
+            BlueprintIdentifier = "A1B2C3D4E5F60718293A4B5C"
             BuildableName = "greeter-App.app"
             BlueprintName = "greeter-App"
             ReferencedContainer = "container:greeter.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "xtool:greeter"
+            BlueprintIdentifier = "A1B2C3D4E5F60718293A4B5C"
             BuildableName = "greeter-App.app"
             BlueprintName = "greeter-App"
             ReferencedContainer = "container:greeter.xcodeproj">
