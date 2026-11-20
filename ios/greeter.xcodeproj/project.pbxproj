@@ -1,0 +1,218 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2D8A47A5DC94644BC8AF8F67 /* empty.c in Sources */ = {isa = PBXBuildFile; fileRef = C262F4686854B9C9C50B59C9 /* empty.c */; };
+		926A90B8A66F3BDD844C88E9 /* greeter in Frameworks */ = {isa = PBXBuildFile; productRef = 1AB0B3F88EE75C3D72902CAB /* greeter */; };
+		C5E809A558D0A38C922F0E20 /* ../Resources/AppIcon.png in Copy Root Resources */ = {isa = PBXBuildFile; fileRef = E890FFED072528486991B189 /* ../Resources/AppIcon.png */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C9585ACD725A27AA56856522 /* Copy Root Resources */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 7;
+			files = (
+				C5E809A558D0A38C922F0E20 /* ../Resources/AppIcon.png in Copy Root Resources */,
+			);
+			name = "Copy Root Resources";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		34F9060F3B8B8EAFFE38BFBA /* Info.plist */ = {isa = PBXFileReference; path = Info.plist; sourceTree = "<group>"; };
+		C262F4686854B9C9C50B59C9 /* empty.c */ = {isa = PBXFileReference; path = empty.c; sourceTree = "<group>"; };
+		CCD0240BB6F1ABE236B203AE /* greeter-App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "greeter-App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E890FFED072528486991B189 /* ../Resources/AppIcon.png */ = {isa = PBXFileReference; path = ../Resources/AppIcon.png; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4ACCBE68C3C3F669B9C10D66 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				926A90B8A66F3BDD844C88E9 /* greeter in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0CE2A473EE60E0ECCF0CB7B4 /* greeter */ = {
+			isa = PBXGroup;
+			children = (
+				C262F4686854B9C9C50B59C9 /* empty.c */,
+				34F9060F3B8B8EAFFE38BFBA /* Info.plist */,
+				E890FFED072528486991B189 /* ../Resources/AppIcon.png */,
+			);
+			path = greeter;
+			sourceTree = "<group>";
+		};
+		2DEE401C9A3BBE133470841B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CCD0240BB6F1ABE236B203AE /* greeter-App.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CE48AFF555C358FA7591495E = {
+			isa = PBXGroup;
+			children = (
+				0CE2A473EE60E0ECCF0CB7B4 /* greeter */,
+				2DEE401C9A3BBE133470841B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		"xtool:greeter" /* greeter-App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E4552FDBF9A5D40AE0C34CE8 /* Build configuration list for PBXNativeTarget "greeter-App" */;
+			buildPhases = (
+				E9773932041CB40F51318461 /* Sources */,
+				4ACCBE68C3C3F669B9C10D66 /* Frameworks */,
+				C9585ACD725A27AA56856522 /* Copy Root Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "greeter-App";
+			packageProductDependencies = (
+				1AB0B3F88EE75C3D72902CAB /* greeter */,
+			);
+			productReference = CCD0240BB6F1ABE236B203AE /* greeter-App.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3155DFA111A5D8728968D8A0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = A523D3211DDB615AE9783370 /* Build configuration list for PBXProject "greeter" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = CE48AFF555C358FA7591495E;
+			packageReferences = (
+				91E10379897D48E98E79CFAB /* XCLocalSwiftPackageReference ".." */,
+			);
+			productRefGroup = 2DEE401C9A3BBE133470841B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				"xtool:greeter" /* greeter-App */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E9773932041CB40F51318461 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2D8A47A5DC94644BC8AF8F67 /* empty.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0C76E4EF0A975C607C9013AD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
+		};
+		C3009CF25275FBFB7FBC8755 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = Release;
+		};
+		CB8DD5C4A88B50953FECF157 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = greeter/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.greeter;
+				PRODUCT_NAME = "greeter-App";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		DC9988F1781EEBCD10A51ADE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = greeter/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.greeter;
+				PRODUCT_NAME = "greeter-App";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A523D3211DDB615AE9783370 /* Build configuration list for PBXProject "greeter" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C76E4EF0A975C607C9013AD /* Debug */,
+				C3009CF25275FBFB7FBC8755 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E4552FDBF9A5D40AE0C34CE8 /* Build configuration list for PBXNativeTarget "greeter-App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC9988F1781EEBCD10A51ADE /* Debug */,
+				CB8DD5C4A88B50953FECF157 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		91E10379897D48E98E79CFAB /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1AB0B3F88EE75C3D72902CAB /* greeter */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = greeter;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 3155DFA111A5D8728968D8A0 /* Project object */;
+}
