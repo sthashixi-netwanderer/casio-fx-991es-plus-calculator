@@ -13,6 +13,8 @@ public enum MathSlotID: Equatable, Hashable, Sendable {
     case integralIntegrand(UUID)
     case integralLower(UUID)
     case integralUpper(UUID)
+    case derivativeFunction(UUID)
+    case derivativePoint(UUID)
     case summationExpr(UUID)
     case summationLower(UUID)
     case summationUpper(UUID)
@@ -20,6 +22,9 @@ public enum MathSlotID: Equatable, Hashable, Sendable {
     case logArg(UUID)
     case parens(UUID)
     case functionArg(UUID)
+    case mixedInteger(UUID)
+    case mixedNumerator(UUID)
+    case mixedDenominator(UUID)
 }
 
 // MARK: - AST Nodes
@@ -30,10 +35,18 @@ public indirect enum MathNode: Identifiable, Equatable, Sendable {
     case exponent(id: UUID, base: [MathNode], power: [MathNode])
     case radical(id: UUID, index: [MathNode]?, radicand: [MathNode])
     case integral(id: UUID, integrand: [MathNode], lower: [MathNode], upper: [MathNode])
+    /// Numerical derivative template: function and evaluation point.
+    case derivative(id: UUID, function: [MathNode], point: [MathNode])
     case summation(id: UUID, expr: [MathNode], lower: [MathNode], upper: [MathNode])
     case logBase(id: UUID, base: [MathNode], arg: [MathNode])
     case parens(id: UUID, children: [MathNode])
     case function(id: UUID, name: String, arg: [MathNode])
+    /// Degree/minute/second marker inserted by the ° ' " key (fx-991ES: a postfix
+    /// marker rendered positionally as °, ', " — the first marker of a group is °,
+    /// the second ', the third ").
+    case dmsMark(id: UUID, glyph: String)
+    /// Mixed fraction template (SHIFT + a b/c): integer part with a stacked fraction.
+    case mixedFraction(id: UUID, integer: [MathNode], num: [MathNode], den: [MathNode])
 
     public var id: UUID {
         switch self {
@@ -42,10 +55,50 @@ public indirect enum MathNode: Identifiable, Equatable, Sendable {
         case .exponent(let id, _, _): return id
         case .radical(let id, _, _): return id
         case .integral(let id, _, _, _): return id
+        case .derivative(let id, _, _): return id
         case .summation(let id, _, _, _): return id
         case .logBase(let id, _, _): return id
         case .parens(let id, _): return id
         case .function(let id, _, _): return id
+        case .dmsMark(let id, _): return id
+        case .mixedFraction(let id, _, _, _): return id
+        }
+    }
+
+    /// Every nested node array of this node. Used for size/depth accounting so
+    /// a key that fires repeatedly cannot grow the expression without bound.
+    public var childNodeArrays: [[MathNode]] {
+        switch self {
+        case .text, .dmsMark: return []
+        case .fraction(_, let num, let den): return [num, den]
+        case .exponent(_, let base, let power): return [base, power]
+        case .radical(_, let index, let radicand): return (index.map { [$0] } ?? []) + [radicand]
+        case .integral(_, let integrand, let lower, let upper): return [integrand, lower, upper]
+        case .derivative(_, let function, let point): return [function, point]
+        case .summation(_, let expr, let lower, let upper): return [expr, lower, upper]
+        case .logBase(_, let base, let arg): return [base, arg]
+        case .parens(_, let children): return [children]
+        case .function(_, _, let arg): return [arg]
+        case .mixedFraction(_, let integer, let num, let den): return [integer, num, den]
+        }
+    }
+
+    /// True when the node can serve as a "value" that a fraction/exponent template
+    /// may absorb as its base/numerator (fx-991ES: templates grab the value
+    /// immediately left of the cursor — never an operator or marker).
+    public var isValueNode: Bool {
+        switch self {
+        case .text(_, let content):
+            let trimmed = content.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return false }
+            if trimmed.allSatisfy({ ($0 >= "0" && $0 <= "9") || $0 == "." }) { return true }
+            // Matrix variables are values too, so the x² / x³ / x⁻¹ keys (and
+            // fraction templates) must grab them as a base (manual §11, §13).
+            return ["MatA", "MatB", "MatC", "MatAns"].contains(trimmed)
+        case .fraction, .exponent, .radical, .parens, .function, .mixedFraction:
+            return true
+        case .integral, .derivative, .summation, .logBase, .dmsMark:
+            return false
         }
     }
 
@@ -73,6 +126,10 @@ public indirect enum MathNode: Identifiable, Equatable, Sendable {
             let lStr = lower.map { $0.toLinearString() }.joined()
             let uStr = upper.map { $0.toLinearString() }.joined()
             return "∫(\(fStr),\(lStr),\(uStr))"
+        case .derivative(_, let function, let point):
+            let fStr = function.map { $0.toLinearString() }.joined()
+            let pStr = point.map { $0.toLinearString() }.joined()
+            return "d/dx(\(fStr),\(pStr))"
         case .summation(_, let expr, let lower, let upper):
             let fStr = expr.map { $0.toLinearString() }.joined()
             let lStr = lower.map { $0.toLinearString() }.joined()
@@ -88,6 +145,16 @@ public indirect enum MathNode: Identifiable, Equatable, Sendable {
         case .function(_, let name, let arg):
             let aStr = arg.map { $0.toLinearString() }.joined()
             return "\(name)(\(aStr))"
+        case .dmsMark(_, let glyph):
+            return glyph
+        case .mixedFraction(_, let integer, let num, let den):
+            let iStr = integer.map { $0.toLinearString() }.joined()
+            let numStr = num.map { $0.toLinearString() }.joined()
+            let denStr = den.map { $0.toLinearString() }.joined()
+            if iStr.isEmpty {
+                return "(\(numStr))/(\(denStr))"
+            }
+            return "(\(iStr)+(\(numStr))/(\(denStr)))"
         }
     }
 }
@@ -147,6 +214,10 @@ public struct MathASTManager: Sendable {
                 if case .integralLower(id) = slot { return lower }
                 if case .integralUpper(id) = slot { return upper }
                 if let res = findSlot(slot: slot, in: integrand) ?? findSlot(slot: slot, in: lower) ?? findSlot(slot: slot, in: upper) { return res }
+            case .derivative(let id, let function, let point):
+                if case .derivativeFunction(id) = slot { return function }
+                if case .derivativePoint(id) = slot { return point }
+                if let res = findSlot(slot: slot, in: function) ?? findSlot(slot: slot, in: point) { return res }
             case .summation(let id, let expr, let lower, let upper):
                 if case .summationExpr(id) = slot { return expr }
                 if case .summationLower(id) = slot { return lower }
@@ -162,6 +233,13 @@ public struct MathASTManager: Sendable {
             case .function(let id, _, let arg):
                 if case .functionArg(id) = slot { return arg }
                 if let res = findSlot(slot: slot, in: arg) { return res }
+            case .mixedFraction(let id, let integer, let num, let den):
+                if case .mixedInteger(id) = slot { return integer }
+                if case .mixedNumerator(id) = slot { return num }
+                if case .mixedDenominator(id) = slot { return den }
+                if let res = findSlot(slot: slot, in: integer) ?? findSlot(slot: slot, in: num) ?? findSlot(slot: slot, in: den) { return res }
+            case .dmsMark:
+                break
             case .text:
                 break
             }
@@ -249,6 +327,22 @@ public struct MathASTManager: Sendable {
                     }
                 }
 
+            case .derivative(let id, let function, let point):
+                if case .derivativeFunction(id) = targetSlot {
+                    updated[i] = .derivative(id: id, function: transform(function), point: point)
+                    return updated
+                } else if case .derivativePoint(id) = targetSlot {
+                    updated[i] = .derivative(id: id, function: function, point: transform(point))
+                    return updated
+                } else {
+                    let nF = updateSlotIn(nodes: function, targetSlot: targetSlot, transform: transform)
+                    let nP = updateSlotIn(nodes: point, targetSlot: targetSlot, transform: transform)
+                    if nF != function || nP != point {
+                        updated[i] = .derivative(id: id, function: nF, point: nP)
+                        return updated
+                    }
+                }
+
             case .summation(let id, let expr, let lower, let upper):
                 if case .summationExpr(id) = targetSlot {
                     updated[i] = .summation(id: id, expr: transform(expr), lower: lower, upper: upper)
@@ -309,6 +403,29 @@ public struct MathASTManager: Sendable {
                     }
                 }
 
+            case .mixedFraction(let id, let integer, let num, let den):
+                if case .mixedInteger(id) = targetSlot {
+                    updated[i] = .mixedFraction(id: id, integer: transform(integer), num: num, den: den)
+                    return updated
+                } else if case .mixedNumerator(id) = targetSlot {
+                    updated[i] = .mixedFraction(id: id, integer: integer, num: transform(num), den: den)
+                    return updated
+                } else if case .mixedDenominator(id) = targetSlot {
+                    updated[i] = .mixedFraction(id: id, integer: integer, num: num, den: transform(den))
+                    return updated
+                } else {
+                    let nI = updateSlotIn(nodes: integer, targetSlot: targetSlot, transform: transform)
+                    let nN = updateSlotIn(nodes: num, targetSlot: targetSlot, transform: transform)
+                    let nD = updateSlotIn(nodes: den, targetSlot: targetSlot, transform: transform)
+                    if nI != integer || nN != num || nD != den {
+                        updated[i] = .mixedFraction(id: id, integer: nI, num: nN, den: nD)
+                        return updated
+                    }
+                }
+
+            case .dmsMark:
+                break
+
             case .text:
                 break
             }
@@ -319,6 +436,7 @@ public struct MathASTManager: Sendable {
     // MARK: - Insertion Operations
 
     public mutating func insertText(_ text: String) {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         var merged = false
@@ -344,12 +462,15 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertFraction() {
+        guard !isAtCapacity else { return }
         let currentNodes = getNodes(in: cursor.slot)
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
-        if targetIndex > 0 && targetIndex <= currentNodes.count {
-            // Take preceding term as numerator
+        if targetIndex > 0 && targetIndex <= currentNodes.count,
+           currentNodes[targetIndex - 1].isValueNode {
+            // Take the preceding value term as numerator (fx-991ES grabs the value
+            // left of the cursor — never an operator or marker)
             let preceding = currentNodes[targetIndex - 1]
             updateSlot(slot: targetSlot) { nodes in
                 var updated = nodes
@@ -374,7 +495,83 @@ public struct MathASTManager: Sendable {
         }
     }
 
+    /// ° ' " key during input: inserts one sexagesimal marker. The glyph is
+    /// positional — the first marker after a value is °, the next ' (after the
+    /// following digits), then " (fx-991ES input syntax: d°m's").
+    public mutating func insertDMSMark() {
+        guard !isAtCapacity else { return }
+        let currentNodes = getNodes(in: cursor.slot)
+        let targetSlot = cursor.slot
+        let targetIndex = cursor.index
+        // Scan backward over the current DMS group (markers separated by numeric
+        // fields) to find the most recent marker, which governs the next glyph.
+        var glyph = "°"
+        var k = targetIndex - 1
+        scan: while k >= 0 {
+            switch currentNodes[k] {
+            case .dmsMark(_, let prevGlyph):
+                switch prevGlyph {
+                case "°": glyph = "'"
+                case "'": glyph = "\""
+                default: glyph = "°"
+                }
+                break scan
+            case .text(_, let content):
+                let isNumeric = !content.isEmpty && content.allSatisfy { ($0 >= "0" && $0 <= "9") || $0 == "." }
+                if isNumeric {
+                    k -= 1
+                    continue
+                }
+                break scan
+            default:
+                break scan
+            }
+        }
+        let mark = MathNode.dmsMark(id: UUID(), glyph: glyph)
+        updateSlot(slot: targetSlot) { nodes in
+            var updated = nodes
+            let safeIdx = min(max(0, targetIndex), updated.count)
+            updated.insert(mark, at: safeIdx)
+            return updated
+        }
+        cursor.index += 1
+    }
+
+    /// SHIFT + a b/c: mixed fraction template. A value immediately left of the
+    /// cursor becomes the integer part (fx-991ES mixed template), cursor then
+    /// moves to the numerator. Without a preceding value the cursor starts in
+    /// the integer field.
+    public mutating func insertMixedFraction() {
+        guard !isAtCapacity else { return }
+        let currentNodes = getNodes(in: cursor.slot)
+        let targetSlot = cursor.slot
+        let targetIndex = cursor.index
+        let id = UUID()
+        if targetIndex > 0 && targetIndex <= currentNodes.count,
+           currentNodes[targetIndex - 1].isValueNode {
+            let preceding = currentNodes[targetIndex - 1]
+            updateSlot(slot: targetSlot) { nodes in
+                var updated = nodes
+                updated.remove(at: targetIndex - 1)
+                let mixed = MathNode.mixedFraction(id: id, integer: [preceding], num: [], den: [])
+                updated.insert(mixed, at: targetIndex - 1)
+                return updated
+            }
+            cursor = CursorPath(slot: .mixedNumerator(id), index: 0)
+        } else {
+            let mixed = MathNode.mixedFraction(id: id, integer: [], num: [], den: [])
+            updateSlot(slot: targetSlot) { nodes in
+                var updated = nodes
+                let safeIdx = min(max(0, targetIndex), updated.count)
+                updated.insert(mixed, at: safeIdx)
+                return updated
+            }
+            cursor = CursorPath(slot: .mixedInteger(id), index: 0)
+        }
+    }
+
     public mutating func insertRadical(index: [MathNode]? = nil) {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
@@ -389,6 +586,7 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertNthRoot() {
+        guard !isAtCapacity else { return }
         let id = UUID()
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
@@ -403,6 +601,7 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertCubeRoot() {
+        guard !isAtCapacity else { return }
         let id = UUID()
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
@@ -417,11 +616,13 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertExponent() {
+        guard !isAtCapacity else { return }
         let currentNodes = getNodes(in: cursor.slot)
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
-        if targetIndex > 0 && targetIndex <= currentNodes.count {
+        if targetIndex > 0 && targetIndex <= currentNodes.count,
+           currentNodes[targetIndex - 1].isValueNode {
             let preceding = currentNodes[targetIndex - 1]
             updateSlot(slot: targetSlot) { nodes in
                 var updated = nodes
@@ -443,7 +644,25 @@ public struct MathASTManager: Sendable {
         }
     }
 
+    /// SHIFT + ∫: numerical derivative template with a function field and a
+    /// field for the point at which to evaluate it (reference §9.5).
+    public mutating func insertDerivative() {
+        guard !isAtCapacity else { return }
+        let targetSlot = cursor.slot
+        let targetIndex = cursor.index
+        let id = UUID()
+        let node = MathNode.derivative(id: id, function: [], point: [])
+        updateSlot(slot: targetSlot) { nodes in
+            var updated = nodes
+            let safeIdx = min(max(0, targetIndex), updated.count)
+            updated.insert(node, at: safeIdx)
+            return updated
+        }
+        cursor = CursorPath(slot: .derivativeFunction(id), index: 0)
+    }
+
     public mutating func insertIntegral() {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
@@ -458,6 +677,7 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertSummation() {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
@@ -472,6 +692,7 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertLogBase() {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
@@ -486,6 +707,7 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertParens() {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
@@ -500,6 +722,7 @@ public struct MathASTManager: Sendable {
     }
 
     public mutating func insertFunction(_ name: String) {
+        guard !isAtCapacity else { return }
         let targetSlot = cursor.slot
         let targetIndex = cursor.index
         let id = UUID()
@@ -555,6 +778,12 @@ public struct MathASTManager: Sendable {
                     }
                 case .exponent(_, let base, _):
                     replacement = base
+                case .derivative(let id, let function, let point):
+                    if cursor.slot == .derivativeFunction(id) {
+                        replacement = function
+                    } else if cursor.slot == .derivativePoint(id) {
+                        replacement = point
+                    }
                 case .radical(let id, let index, _):
                     if cursor.slot == .radicalRadicand(id) && index != nil {
                         replacement = index ?? []
@@ -620,6 +849,9 @@ public struct MathASTManager: Sendable {
         case .integralIntegrand(let id):
             let upNodes = getNodes(in: .integralUpper(id))
             cursor = CursorPath(slot: .integralUpper(id), index: min(cursor.index, upNodes.count))
+        case .derivativePoint(let id):
+            let funcNodes = getNodes(in: .derivativeFunction(id))
+            cursor = CursorPath(slot: .derivativeFunction(id), index: min(cursor.index, funcNodes.count))
         case .summationLower(let id):
             let exprNodes = getNodes(in: .summationExpr(id))
             cursor = CursorPath(slot: .summationExpr(id), index: min(cursor.index, exprNodes.count))
@@ -632,6 +864,12 @@ public struct MathASTManager: Sendable {
         case .exponentBase(let id):
             let powerNodes = getNodes(in: .exponentPower(id))
             cursor = CursorPath(slot: .exponentPower(id), index: min(cursor.index, powerNodes.count))
+        case .mixedDenominator(let id):
+            let numNodes = getNodes(in: .mixedNumerator(id))
+            cursor = CursorPath(slot: .mixedNumerator(id), index: min(cursor.index, numNodes.count))
+        case .mixedNumerator(let id):
+            let intNodes = getNodes(in: .mixedInteger(id))
+            cursor = CursorPath(slot: .mixedInteger(id), index: min(cursor.index, intNodes.count))
         default:
             break
         }
@@ -648,6 +886,9 @@ public struct MathASTManager: Sendable {
         case .integralIntegrand(let id):
             let lowNodes = getNodes(in: .integralLower(id))
             cursor = CursorPath(slot: .integralLower(id), index: min(cursor.index, lowNodes.count))
+        case .derivativeFunction(let id):
+            let pointNodes = getNodes(in: .derivativePoint(id))
+            cursor = CursorPath(slot: .derivativePoint(id), index: min(cursor.index, pointNodes.count))
         case .summationUpper(let id):
             let exprNodes = getNodes(in: .summationExpr(id))
             cursor = CursorPath(slot: .summationExpr(id), index: min(cursor.index, exprNodes.count))
@@ -659,6 +900,12 @@ public struct MathASTManager: Sendable {
             cursor = CursorPath(slot: .logBase(id), index: min(cursor.index, baseNodes.count))
         case .exponentPower:
             exitSlotRight()
+        case .mixedInteger(let id):
+            let numNodes = getNodes(in: .mixedNumerator(id))
+            cursor = CursorPath(slot: .mixedNumerator(id), index: min(cursor.index, numNodes.count))
+        case .mixedNumerator(let id):
+            let denNodes = getNodes(in: .mixedDenominator(id))
+            cursor = CursorPath(slot: .mixedDenominator(id), index: min(cursor.index, denNodes.count))
         default:
             break
         }
@@ -670,11 +917,13 @@ public struct MathASTManager: Sendable {
         case .exponent(let id, let base, _): return base.isEmpty ? (.exponentPower(id), 0) : (.exponentBase(id), 0)
         case .radical(let id, let index, _): return index != nil ? (.radicalIndex(id), 0) : (.radicalRadicand(id), 0)
         case .integral(let id, _, _, _): return (.integralIntegrand(id), 0)
+        case .derivative(let id, _, _): return (.derivativeFunction(id), 0)
         case .summation(let id, _, _, _): return (.summationExpr(id), 0)
         case .logBase(let id, _, _): return (.logBase(id), 0)
         case .parens(let id, _): return (.parens(id), 0)
         case .function(let id, _, _): return (.functionArg(id), 0)
-        case .text: return nil
+        case .mixedFraction(let id, _, _, _): return (.mixedInteger(id), 0)
+        case .text, .dmsMark: return nil
         }
     }
 
@@ -684,27 +933,60 @@ public struct MathASTManager: Sendable {
         case .exponent(let id, _, let power): return (.exponentPower(id), power.count)
         case .radical(let id, _, let radicand): return (.radicalRadicand(id), radicand.count)
         case .integral(let id, _, let lower, _): return (.integralLower(id), lower.count)
+        case .derivative(let id, _, let point): return (.derivativePoint(id), point.count)
         case .summation(let id, _, let lower, _): return (.summationLower(id), lower.count)
         case .logBase(let id, _, let arg): return (.logArg(id), arg.count)
         case .parens(let id, let children): return (.parens(id), children.count)
         case .function(let id, _, let arg): return (.functionArg(id), arg.count)
-        case .text: return nil
+        case .mixedFraction(let id, _, _, let den): return (.mixedDenominator(id), den.count)
+        case .text, .dmsMark: return nil
         }
     }
 
+    /// Move right out of the current field into the next field of the same
+    /// template, in visual order. Only when every field has been visited does
+    /// the cursor leave the template for the parent expression.
     private mutating func exitSlotRight() {
         switch cursor.slot {
+        case .fractionNumerator(let id):
+            cursor = CursorPath(slot: .fractionDenominator(id), index: 0)
+            return
+        case .exponentBase(let id):
+            cursor = CursorPath(slot: .exponentPower(id), index: 0)
+            return
         case .radicalIndex(let id):
             cursor = CursorPath(slot: .radicalRadicand(id), index: 0)
             return
         case .logBase(let id):
             cursor = CursorPath(slot: .logArg(id), index: 0)
             return
+        case .integralIntegrand(let id):
+            let lower = getNodes(in: .integralLower(id))
+            cursor = CursorPath(slot: .integralLower(id), index: lower.count)
+            return
         case .integralLower(let id):
-            cursor = CursorPath(slot: .integralIntegrand(id), index: 0)
+            let upper = getNodes(in: .integralUpper(id))
+            cursor = CursorPath(slot: .integralUpper(id), index: upper.count)
+            return
+        case .derivativeFunction(let id):
+            let point = getNodes(in: .derivativePoint(id))
+            cursor = CursorPath(slot: .derivativePoint(id), index: point.count)
+            return
+        case .summationExpr(let id):
+            let lower = getNodes(in: .summationLower(id))
+            cursor = CursorPath(slot: .summationLower(id), index: lower.count)
             return
         case .summationLower(let id):
-            cursor = CursorPath(slot: .summationExpr(id), index: 0)
+            let upper = getNodes(in: .summationUpper(id))
+            cursor = CursorPath(slot: .summationUpper(id), index: upper.count)
+            return
+        case .mixedInteger(let id):
+            let numerator = getNodes(in: .mixedNumerator(id))
+            cursor = CursorPath(slot: .mixedNumerator(id), index: numerator.count)
+            return
+        case .mixedNumerator(let id):
+            let denominator = getNodes(in: .mixedDenominator(id))
+            cursor = CursorPath(slot: .mixedDenominator(id), index: denominator.count)
             return
         default:
             break
@@ -713,8 +995,18 @@ public struct MathASTManager: Sendable {
         cursor = CursorPath(slot: parentInfo.parentSlot, index: parentInfo.nodeIndexInParent + 1)
     }
 
+    /// Reverse of `exitSlotRight()` — step through the template's fields in
+    /// reverse visual order before leaving for the parent expression.
     private mutating func exitSlotLeft() {
         switch cursor.slot {
+        case .fractionDenominator(let id):
+            let numerator = getNodes(in: .fractionNumerator(id))
+            cursor = CursorPath(slot: .fractionNumerator(id), index: numerator.count)
+            return
+        case .exponentPower(let id):
+            let base = getNodes(in: .exponentBase(id))
+            cursor = CursorPath(slot: .exponentBase(id), index: base.count)
+            return
         case .radicalRadicand(let id):
             if let parentInfo = findParentSlot(of: cursor.slot, in: root) {
                 let parentNodes = getNodes(in: parentInfo.parentSlot)
@@ -730,13 +1022,33 @@ public struct MathASTManager: Sendable {
             let baseNodes = getNodes(in: .logBase(id))
             cursor = CursorPath(slot: .logBase(id), index: baseNodes.count)
             return
-        case .integralIntegrand(let id):
-            let lowNodes = getNodes(in: .integralLower(id))
-            cursor = CursorPath(slot: .integralLower(id), index: lowNodes.count)
+        case .integralUpper(let id):
+            let lower = getNodes(in: .integralLower(id))
+            cursor = CursorPath(slot: .integralLower(id), index: lower.count)
             return
-        case .summationExpr(let id):
-            let lowNodes = getNodes(in: .summationLower(id))
-            cursor = CursorPath(slot: .summationLower(id), index: lowNodes.count)
+        case .integralLower(let id):
+            let integrand = getNodes(in: .integralIntegrand(id))
+            cursor = CursorPath(slot: .integralIntegrand(id), index: integrand.count)
+            return
+        case .derivativePoint(let id):
+            let function = getNodes(in: .derivativeFunction(id))
+            cursor = CursorPath(slot: .derivativeFunction(id), index: function.count)
+            return
+        case .summationUpper(let id):
+            let lower = getNodes(in: .summationLower(id))
+            cursor = CursorPath(slot: .summationLower(id), index: lower.count)
+            return
+        case .summationLower(let id):
+            let expr = getNodes(in: .summationExpr(id))
+            cursor = CursorPath(slot: .summationExpr(id), index: expr.count)
+            return
+        case .mixedDenominator(let id):
+            let numerator = getNodes(in: .mixedNumerator(id))
+            cursor = CursorPath(slot: .mixedNumerator(id), index: numerator.count)
+            return
+        case .mixedNumerator(let id):
+            let integer = getNodes(in: .mixedInteger(id))
+            cursor = CursorPath(slot: .mixedInteger(id), index: integer.count)
             return
         default:
             break
@@ -788,6 +1100,14 @@ public struct MathASTManager: Sendable {
                     findParentSlot(of: targetSlot, in: upper, currentSlot: .integralUpper(id)) {
                     return res
                 }
+            case .derivative(let id, let function, let point):
+                if targetSlot == .derivativeFunction(id) || targetSlot == .derivativePoint(id) {
+                    return ParentInfo(parentSlot: currentSlot, nodeIndexInParent: i)
+                }
+                if let res = findParentSlot(of: targetSlot, in: function, currentSlot: .derivativeFunction(id)) ??
+                    findParentSlot(of: targetSlot, in: point, currentSlot: .derivativePoint(id)) {
+                    return res
+                }
             case .summation(let id, let expr, let lower, let upper):
                 if targetSlot == .summationExpr(id) || targetSlot == .summationLower(id) || targetSlot == .summationUpper(id) {
                     return ParentInfo(parentSlot: currentSlot, nodeIndexInParent: i)
@@ -819,10 +1139,66 @@ public struct MathASTManager: Sendable {
                 if let res = findParentSlot(of: targetSlot, in: arg, currentSlot: .functionArg(id)) {
                     return res
                 }
+            case .mixedFraction(let id, let integer, let num, let den):
+                if targetSlot == .mixedInteger(id) || targetSlot == .mixedNumerator(id) || targetSlot == .mixedDenominator(id) {
+                    return ParentInfo(parentSlot: currentSlot, nodeIndexInParent: i)
+                }
+                if let res = findParentSlot(of: targetSlot, in: integer, currentSlot: .mixedInteger(id)) ??
+                    findParentSlot(of: targetSlot, in: num, currentSlot: .mixedNumerator(id)) ??
+                    findParentSlot(of: targetSlot, in: den, currentSlot: .mixedDenominator(id)) {
+                    return res
+                }
+            case .dmsMark:
+                break
             case .text:
                 break
             }
         }
         return nil
+    }
+
+    // MARK: - Input Capacity
+    //
+    // The real fx-991ES PLUS has a limited expression buffer (roughly 99 display
+    // characters / 79 key steps). Enforcing a comparable AST limit keeps input
+    // responsive even if a key is held down and fires hundreds of times.
+
+    public static let maxNodes = 160
+    public static let maxDepth = 32
+
+    private func countNodes(_ nodes: [MathNode]) -> Int {
+        var total = 0
+        for node in nodes {
+            total += 1
+            for child in node.childNodeArrays { total += countNodes(child) }
+        }
+        return total
+    }
+
+    private func depth(of nodes: [MathNode]) -> Int {
+        var best = 0
+        for node in nodes {
+            var nodeDepth = 1
+            for child in node.childNodeArrays {
+                nodeDepth = Swift.max(nodeDepth, 1 + depth(of: child))
+            }
+            best = Swift.max(best, nodeDepth)
+        }
+        return best
+    }
+
+    public var nodeCount: Int { countNodes(root) }
+    public var expressionDepth: Int { depth(of: root) }
+
+    /// True when input capacity is nearly exhausted — the LCD cursor changes
+    /// shape as a warning (fx-991ES: within roughly 10 bytes of the limit).
+    public var isNearCapacity: Bool {
+        nodeCount >= Self.maxNodes - 10 || expressionDepth >= Self.maxDepth - 2
+    }
+
+    /// True when the expression is as complex as this model allows. Input is
+    /// ignored at that point; DEL / AC still work so the user can recover.
+    public var isAtCapacity: Bool {
+        nodeCount >= Self.maxNodes || expressionDepth >= Self.maxDepth
     }
 }

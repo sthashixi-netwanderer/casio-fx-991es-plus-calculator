@@ -162,9 +162,23 @@ public struct ExactValue: Equatable, Sendable {
 
     // MARK: - 2D MathAST Generation (for Natural-V.P.A.M. LCD display)
 
-    public func toMathNodes() -> [MathNode] {
+    public func toMathNodes(mixed: Bool = false) -> [MathNode] {
         if isZero {
             return [.text(id: UUID(), content: "0")]
+        }
+
+        // Mixed fraction display (SHIFT+S⇔D a b/c ⇔ d/c): pure rational p/q with
+        // q > 1 renders as whole part + stacked proper fraction.
+        if mixed, piCoeff.isZero, surdTerms.count == 1, let r = surdTerms[1], r.den > 1 {
+            let whole = r.num / r.den // truncates toward zero
+            let rem = abs(r.num - whole * r.den)
+            var nodes: [MathNode] = []
+            if r.num < 0 { nodes.append(.text(id: UUID(), content: "-")) }
+            if whole != 0 {
+                nodes.append(.text(id: UUID(), content: "\(abs(whole))"))
+            }
+            nodes.append(.fraction(id: UUID(), num: [.text(id: UUID(), content: "\(rem)")], den: [.text(id: UUID(), content: "\(r.den)")]))
+            return nodes
         }
 
         // Collect all denominators to find a common denominator
@@ -343,8 +357,21 @@ public enum ExactEvaluator {
     }
 
     public static func evaluate(nodes: [MathNode], angleUnit: AngleUnit = .deg) -> ExactValue? {
+        return evaluate(nodes: nodes, angleUnit: angleUnit, ans: 0, variables: [:])
+    }
+
+    public static func evaluate(
+        nodes: [MathNode],
+        angleUnit: AngleUnit = .deg,
+        ans: Double,
+        variables: [Character: Double]
+    ) -> ExactValue? {
         guard !nodes.isEmpty else { return nil }
         var tokens: [ExactToken] = []
+        // Sexagesimal (° ' ") state: a marker scales the preceding value and
+        // implies addition with the next DMS field (d + m/60 + s/3600).
+        var pendingDMSAdd = false
+        var lastWasMark = false
 
         var i = 0
         while i < nodes.count {
@@ -353,8 +380,10 @@ public enum ExactEvaluator {
             case .text(_, let content):
                 let trimmed = content.trimmingCharacters(in: .whitespaces)
                 if trimmed == "+" {
+                    pendingDMSAdd = false
                     tokens.append(.binaryOp("+", 1))
                 } else if trimmed == "-" || trimmed == "−" {
+                    pendingDMSAdd = false
                     // Check if unary negation
                     var isUnary = false
                     if let last = tokens.last {
@@ -372,14 +401,32 @@ public enum ExactEvaluator {
                         tokens.append(.binaryOp("-", 1))
                     }
                 } else if trimmed == "×" || trimmed == "*" {
+                    pendingDMSAdd = false
                     tokens.append(.binaryOp("×", 2))
                 } else if trimmed == "÷" || trimmed == "/" {
+                    pendingDMSAdd = false
                     tokens.append(.binaryOp("÷", 2))
                 } else if trimmed == "π" {
+                    pendingDMSAdd = false
                     if let last = tokens.last, canImplicitMultiply(last) {
                         tokens.append(.binaryOp("×", 3)) // Casio precedence 3 for implicit
                     }
                     tokens.append(.val(.piMultiple(Rational(1, 1))))
+                } else if trimmed == "Ans" {
+                    guard let frac = Fraction.fromDouble(ans) else { return nil }
+                    pendingDMSAdd = false
+                    if let last = tokens.last, canImplicitMultiply(last) {
+                        tokens.append(.binaryOp("×", 3))
+                    }
+                    tokens.append(.val(.rational(Rational(frac.num, frac.den))))
+                } else if trimmed.count == 1, let varChar = trimmed.first,
+                          ["A", "B", "C", "D", "E", "F", "X", "Y", "M"].contains(varChar) {
+                    guard let varFrac = Fraction.fromDouble(variables[varChar] ?? 0) else { return nil }
+                    pendingDMSAdd = false
+                    if let last = tokens.last, canImplicitMultiply(last) {
+                        tokens.append(.binaryOp("×", 3))
+                    }
+                    tokens.append(.val(.rational(Rational(varFrac.num, varFrac.den))))
                 } else if trimmed.allSatisfy({ ($0 >= "0" && $0 <= "9") || $0 == "." }) {
                     var numStr = trimmed
                     while i + 1 < nodes.count {
@@ -393,15 +440,17 @@ public enum ExactEvaluator {
                         }
                         break
                     }
+                    if pendingDMSAdd {
+                        // DMS field join binds at implicit-multiply precedence so
+                        // the whole d°m's" group stays atomic against operators
+                        tokens.append(.binaryOp("+", 3))
+                        pendingDMSAdd = false
+                    } else if let last = tokens.last, canImplicitMultiply(last) {
+                        tokens.append(.binaryOp("×", 3))
+                    }
                     if let intVal = Int64(numStr) {
-                        if let last = tokens.last, canImplicitMultiply(last) {
-                            tokens.append(.binaryOp("×", 3))
-                        }
                         tokens.append(.val(.rational(Rational(intVal, 1))))
                     } else if let dVal = Double(numStr), let frac = Fraction.fromDouble(dVal) {
-                        if let last = tokens.last, canImplicitMultiply(last) {
-                            tokens.append(.binaryOp("×", 3))
-                        }
                         tokens.append(.val(.rational(Rational(frac.num, frac.den))))
                     } else {
                         return nil
@@ -409,23 +458,64 @@ public enum ExactEvaluator {
                 } else {
                     return nil
                 }
+                lastWasMark = false
 
-            case .fraction(_, let num, let den):
-                guard let numVal = evaluate(nodes: num, angleUnit: angleUnit),
-                      let denVal = evaluate(nodes: den, angleUnit: angleUnit),
-                      let res = numVal / denVal else {
+            case .dmsMark(_, let glyph):
+                // Postfix marker: scales the value it follows (° = ×1, ' = ÷60,
+                // " = ÷3600) and implies addition of the next field.
+                guard !lastWasMark, case .val(let v)? = tokens.last else { return nil }
+                let factor: Rational
+                switch glyph {
+                case "°": factor = Rational(1, 1)
+                case "'": factor = Rational(1, 60)
+                case "\"": factor = Rational(1, 3600)
+                default: return nil
+                }
+                tokens[tokens.count - 1] = .val(v * ExactValue.rational(factor))
+                pendingDMSAdd = true
+                lastWasMark = true
+
+            case .mixedFraction(_, let integer, let num, let den):
+                guard let intVal = evaluate(nodes: integer, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let numVal = evaluate(nodes: num, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let denVal = evaluate(nodes: den, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let fracPart = numVal / denVal else {
                     return nil
                 }
-                if let last = tokens.last, canImplicitMultiply(last) {
+                let res = intVal + fracPart
+                if pendingDMSAdd {
+                    // DMS field join binds at implicit-multiply precedence so the
+                    // whole d°m0027s" group stays atomic against surrounding operators
+                    tokens.append(.binaryOp("+", 3))
+                    pendingDMSAdd = false
+                } else if let last = tokens.last, canImplicitMultiply(last) {
                     tokens.append(.binaryOp("×", 3))
                 }
                 tokens.append(.val(res))
+                lastWasMark = false
+
+            case .fraction(_, let num, let den):
+                guard let numVal = evaluate(nodes: num, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let denVal = evaluate(nodes: den, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let res = numVal / denVal else {
+                    return nil
+                }
+                if pendingDMSAdd {
+                    // DMS field join binds at implicit-multiply precedence so the
+                    // whole d°m0027s" group stays atomic against surrounding operators
+                    tokens.append(.binaryOp("+", 3))
+                    pendingDMSAdd = false
+                } else if let last = tokens.last, canImplicitMultiply(last) {
+                    tokens.append(.binaryOp("×", 3))
+                }
+                tokens.append(.val(res))
+                lastWasMark = false
 
             case .radical(_, let index, let radicand):
-                guard let radVal = evaluate(nodes: radicand, angleUnit: angleUnit) else { return nil }
+                guard let radVal = evaluate(nodes: radicand, angleUnit: angleUnit, ans: ans, variables: variables) else { return nil }
                 if let idx = index {
                     // Exact integer nth-root
-                    guard let idxVal = evaluate(nodes: idx, angleUnit: angleUnit),
+                    guard let idxVal = evaluate(nodes: idx, angleUnit: angleUnit, ans: ans, variables: variables),
                           idxVal.surdTerms.count == 1, let idxQ = idxVal.surdTerms[1], idxVal.piCoeff.isZero, idxQ.den == 1, idxQ.num >= 2 else { return nil }
                     let n = idxQ.num
                     guard radVal.surdTerms.count == 1, let q = radVal.surdTerms[1], radVal.piCoeff.isZero, q.den == 1, q.num >= 0 else { return nil }
@@ -460,8 +550,8 @@ public enum ExactEvaluator {
                 }
 
             case .logBase(_, let base, let arg):
-                guard let bVal = evaluate(nodes: base, angleUnit: angleUnit),
-                      let aVal = evaluate(nodes: arg, angleUnit: angleUnit) else { return nil }
+                guard let bVal = evaluate(nodes: base, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let aVal = evaluate(nodes: arg, angleUnit: angleUnit, ans: ans, variables: variables) else { return nil }
                 guard bVal.surdTerms.count == 1, let bQ = bVal.surdTerms[1], bVal.piCoeff.isZero, bQ.den == 1, bQ.num > 1,
                       aVal.surdTerms.count == 1, let aQ = aVal.surdTerms[1], aVal.piCoeff.isZero, aQ.den == 1, aQ.num >= 1 else { return nil }
                 let b = bQ.num
@@ -482,8 +572,8 @@ public enum ExactEvaluator {
                 }
 
             case .exponent(_, let base, let power):
-                guard let bVal = evaluate(nodes: base, angleUnit: angleUnit),
-                      let pVal = evaluate(nodes: power, angleUnit: angleUnit) else { return nil }
+                guard let bVal = evaluate(nodes: base, angleUnit: angleUnit, ans: ans, variables: variables),
+                      let pVal = evaluate(nodes: power, angleUnit: angleUnit, ans: ans, variables: variables) else { return nil }
                 // Only integer powers supported exactly
                 guard pVal.surdTerms.count == 1, let q = pVal.surdTerms[1], pVal.piCoeff.isZero, q.den == 1 else { return nil }
                 let exp = q.num
@@ -508,11 +598,11 @@ public enum ExactEvaluator {
                 if let last = tokens.last, canImplicitMultiply(last) {
                     tokens.append(.binaryOp("×", 3))
                 }
-                guard let val = evaluate(nodes: children, angleUnit: angleUnit) else { return nil }
+                guard let val = evaluate(nodes: children, angleUnit: angleUnit, ans: ans, variables: variables) else { return nil }
                 tokens.append(.val(val))
 
             case .function(_, let name, let arg):
-                guard let argVal = evaluate(nodes: arg, angleUnit: angleUnit) else { return nil }
+                guard let argVal = evaluate(nodes: arg, angleUnit: angleUnit, ans: ans, variables: variables) else { return nil }
                 guard let res = evaluateExactFunction(name: name, arg: argVal, angleUnit: angleUnit) else { return nil }
                 if let last = tokens.last, canImplicitMultiply(last) {
                     tokens.append(.binaryOp("×", 3))

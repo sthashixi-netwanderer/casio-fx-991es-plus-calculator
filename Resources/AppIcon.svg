@@ -1,0 +1,189 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Background gradient: deep graphite with a cool blue抬 shift -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0f14"/>
+      <stop offset="0.55" stop-color="#101a24"/>
+      <stop offset="1" stop-color="#1b2b38"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="42%" r="55%">
+      <stop offset="0" stop-color="#4fe0b0" stop-opacity="0.30"/>
+      <stop offset="0.55" stop-color="#2aa6a0" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#2aa6a0" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Calculator body -->
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#39434f"/>
+      <stop offset="0.45" stop-color="#232d38"/>
+      <stop offset="1" stop-color="#111821"/>
+    </linearGradient>
+    <linearGradient id="bodyEdge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7f8c99" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#4a5663" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.55"/>
+    </linearGradient>
+
+    <!-- LCD screen -->
+    <linearGradient id="lcd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8ffe9"/>
+      <stop offset="0.5" stop-color="#c9f3d2"/>
+      <stop offset="1" stop-color="#a8e2bb"/>
+    </linearGradient>
+
+    <!-- Gold accent -->
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe9a8"/>
+      <stop offset="0.5" stop-color="#e8b94e"/>
+      <stop offset="1" stop-color="#b9801f"/>
+    </linearGradient>
+
+    <!-- Key faces -->
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d4753"/>
+      <stop offset="1" stop-color="#28323d"/>
+    </linearGradient>
+    <linearGradient id="keyGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2cf72"/>
+      <stop offset="1" stop-color="#c8932b"/>
+    </linearGradient>
+    <linearGradient id="keyTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fd6b0"/>
+      <stop offset="1" stop-color="#248f7d"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="26" stdDeviation="30" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+
+    <clipPath id="screenClip">
+      <rect x="268" y="232" width="488" height="252" rx="22"/>
+    </clipPath>
+  </defs>
+
+  <!-- Full-bleed background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#halo)"/>
+
+  <!-- Fine dotted texture -->
+  <g fill="#ffffff" opacity="0.045">
+    <circle cx="120" cy="170" r="2"/><circle cx="190" cy="120" r="1.5"/><circle cx="880" cy="210" r="2"/>
+    <circle cx="930" cy="430" r="1.5"/><circle cx="90" cy="520" r="2"/><circle cx="150" cy="860" r="1.5"/>
+    <circle cx="870" cy="840" r="2"/><circle cx="940" cy="700" r="1.5"/><circle cx="70" cy="330" r="1.5"/>
+  </g>
+
+  <!-- Golden signature arc sweeping around the device -->
+  <path d="M 150 780 C 60 560, 120 250, 360 130 C 610 5, 900 120, 930 380"
+        fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round" opacity="0.85"
+        filter="url(#glow)"/>
+  <path d="M 874 930 C 1010 760, 1000 470, 830 300"
+        fill="none" stroke="url(#gold)" stroke-width="4" stroke-linecap="round" opacity="0.45"/>
+
+  <!-- Floating math glyphs -->
+  <g font-family="DejaVu Sans, sans-serif" font-weight="bold" fill="url(#gold)" opacity="0.9">
+    <text x="128" y="300" font-size="54">&#8747;</text>
+    <text x="858" y="180" font-size="46">&#952;</text>
+    <text x="900" y="600" font-size="40">&#8764;</text>
+  </g>
+  <g font-family="DejaVu Sans, sans-serif" font-size="30" fill="#7ff0c6" opacity="0.75" filter="url(#glow)">
+    <text x="200" y="910">&#960;</text>
+    <text x="786" y="900">&#8747;</text>
+  </g>
+
+  <!-- Calculator body -->
+  <g filter="url(#shadow)">
+    <rect x="214" y="150" width="596" height="724" rx="78" fill="url(#body)" stroke="url(#bodyEdge)" stroke-width="3"/>
+    <!-- top highlight sheen -->
+    <path d="M 250 168 Q 512 120 774 168" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Brand plate -->
+  <text x="512" y="207" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="26"
+        font-weight="bold" letter-spacing="7" fill="#9fb0bd" opacity="0.9">SCIENTIFIC</text>
+
+  <!-- LCD bezel -->
+  <rect x="252" y="216" width="520" height="284" rx="30" fill="#0b1014" opacity="0.9"/>
+  <!-- LCD screen -->
+  <rect x="268" y="232" width="488" height="252" rx="22" fill="url(#lcd)"/>
+  <g clip-path="url(#screenClip)">
+    <!-- faint LCD scanlines -->
+    <g stroke="#5aa87c" stroke-opacity="0.10" stroke-width="1">
+      <line x1="268" y1="252" x2="756" y2="252"/><line x1="268" y1="272" x2="756" y2="272"/>
+      <line x1="268" y1="292" x2="756" y2="292"/><line x1="268" y1="312" x2="756" y2="312"/>
+      <line x1="268" y1="332" x2="756" y2="332"/><line x1="268" y1="352" x2="756" y2="352"/>
+      <line x1="268" y1="372" x2="756" y2="372"/><line x1="268" y1="392" x2="756" y2="392"/>
+      <line x1="268" y1="412" x2="756" y2="412"/><line x1="268" y1="432" x2="756" y2="432"/>
+      <line x1="268" y1="452" x2="756" y2="452"/>
+    </g>
+    <!-- status indicators -->
+    <text x="292" y="268" font-family="DejaVu Sans, sans-serif" font-size="20" font-weight="bold" fill="#2f6b4c">DEG</text>
+    <text x="726" y="268" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="20" font-weight="bold" fill="#2f6b4c">M+</text>
+    <!-- signature expression -->
+    <text x="512" y="398" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="118"
+          font-weight="bold" fill="#1c5136">&#8730;&#931;&#960;</text>
+    <!-- cursor -->
+    <rect x="636" y="320" width="7" height="82" rx="2" fill="#1c5136">
+      <animate attributeName="opacity" values="1;1;0;0" dur="1s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <!-- LCD glass reflection -->
+  <path d="M 280 244 L 430 244 L 300 476 L 274 476 Z" fill="#ffffff" opacity="0.10"/>
+
+  <!-- Keypad -->
+  <g>
+    <!-- Row 1 -->
+    <rect x="252" y="528" width="96" height="60" rx="14" fill="url(#keyTeal)"/>
+    <rect x="364" y="528" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="476" y="528" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="588" y="528" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="700" y="528" width="72" height="60" rx="14" fill="url(#keyGold)"/>
+    <!-- Row 2 -->
+    <rect x="252" y="602" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="364" y="602" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="476" y="602" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="588" y="602" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="700" y="602" width="72" height="60" rx="14" fill="url(#keyGold)"/>
+    <!-- Row 3 -->
+    <rect x="252" y="676" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="364" y="676" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="476" y="676" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="588" y="676" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="700" y="676" width="72" height="60" rx="14" fill="url(#keyGold)"/>
+    <!-- Row 4 -->
+    <rect x="252" y="750" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="364" y="750" width="96" height="60" rx="14" fill="url(#key)"/>
+    <rect x="476" y="750" width="208" height="60" rx="14" fill="url(#keyTeal)"/>
+    <rect x="700" y="750" width="72" height="60" rx="14" fill="url(#keyGold)"/>
+  </g>
+
+  <!-- Key glyphs -->
+  <g font-family="DejaVu Sans, sans-serif" font-size="30" font-weight="bold" text-anchor="middle">
+    <g fill="#dfe7ee">
+      <text x="300" y="568">7</text><text x="412" y="568">8</text><text x="524" y="568">9</text>
+      <text x="300" y="642">4</text><text x="412" y="642">5</text><text x="524" y="642">6</text>
+      <text x="300" y="716">1</text><text x="412" y="716">2</text><text x="524" y="716">3</text>
+      <text x="300" y="790">0</text><text x="412" y="790">.</text>
+    </g>
+    <!-- scientific function column -->
+    <g fill="#7ff0c6" font-size="26">
+      <text x="636" y="568">x&#178;</text><text x="636" y="642">x&#179;</text><text x="636" y="716">&#960;</text>
+    </g>
+    <!-- gold action column -->
+    <g fill="#3a2a06">
+      <text x="736" y="568">&#247;</text><text x="736" y="642">&#215;</text><text x="736" y="716">&#8722;</text><text x="736" y="790">=</text>
+    </g>
+    <text x="580" y="790" text-anchor="middle" font-size="24" font-weight="bold" fill="#06231e">ANS</text>
+  </g>
+
+  <!-- Floating gold sparkle accents -->
+  <g fill="url(#gold)" filter="url(#glow)">
+    <circle cx="172" cy="470" r="6"/><circle cx="846" cy="760" r="5"/><circle cx="800" cy="120" r="4"/>
+  </g>
+</svg>

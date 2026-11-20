@@ -37,24 +37,48 @@ enum CasioTheme {
 
 // MARK: - Key Glyphs & Faces
 
+/// Face of the fx-991ES PLUS ∫ key: the integral sign followed by a stacked
+/// pair of small boxes (upper/lower limits) and a filled integrand bar — the
+/// hardware does not print "dx" on the key cap itself.
 struct IntegrationKeyFace: View {
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(alignment: .center, spacing: 1.5) {
             Text("∫")
-                .font(.system(size: 15, weight: .light, design: .serif))
+                .font(.system(size: 17, weight: .light, design: .serif))
                 .italic()
-                .offset(y: -0.5)
 
-            // Integrand template box
-            RoundedRectangle(cornerRadius: 1.5)
-                .stroke(Color.white.opacity(0.92), lineWidth: 1.2)
-                .frame(width: 8, height: 9)
+            VStack(alignment: .center, spacing: 0.5) {
+                RoundedRectangle(cornerRadius: 0.5)
+                    .stroke(Color.white.opacity(0.95), lineWidth: 0.9)
+                    .frame(width: 5.5, height: 4.5)
+                RoundedRectangle(cornerRadius: 0.5)
+                    .stroke(Color.white.opacity(0.95), lineWidth: 0.9)
+                    .frame(width: 5.5, height: 4.5)
+            }
 
-            Text("dx")
-                .font(.system(size: 11, weight: .medium, design: .serif))
-                .italic()
+            Rectangle()
+                .fill(Color.white.opacity(0.92))
+                .frame(width: 7, height: 2.5)
+                .offset(y: 1)
         }
         .foregroundColor(CasioTheme.inkWhite)
+    }
+}
+
+/// Yellow SHIFT label of the ∫ key. On the hardware d/dx is engraved as a
+/// stacked fraction (d over dx with a rule), not as the plain text "d/dx".
+struct DerivativeShiftLabel: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("d")
+                .font(.system(size: 6, weight: .bold))
+            Rectangle()
+                .fill(CasioTheme.inkShift)
+                .frame(width: 8, height: 0.7)
+            Text("dx")
+                .font(.system(size: 6, weight: .bold))
+        }
+        .foregroundColor(CasioTheme.inkShift)
     }
 }
 
@@ -144,7 +168,6 @@ private enum CasioHaptics {
 struct ContentView: View {
     @StateObject private var engine = CalculatorEngine()
     @State private var codeBuffer: String = ""
-    @State private var waitingForSto: Bool = false
     @State private var tableScrollIndex: Int = 0
 
     private var isPromptActive: Bool {
@@ -152,6 +175,8 @@ struct ContentView: View {
         case .eqnCoeffPrompt, .calcPrompt, .solvePrompt:
             return true
         case .tablePrompt(let step) where step > 0 && step < 4:
+            return true
+        case .matrixDimPrompt, .matrixCellEditor:
             return true
         default:
             return false
@@ -289,10 +314,13 @@ struct ContentView: View {
             annunciator("S", active: engine.shiftActive)
             annunciator("A", active: engine.alphaActive)
             annunciator("M", active: engine.hasMemory)
-            annunciator("STO", active: waitingForSto)
+            annunciator("STO", active: engine.waitingForSto)
+            annunciator("RCL", active: engine.waitingForRcl)
             Spacer()
             annunciator("CMPLX", active: engine.activeMode == .cmplx)
             annunciator("STAT", active: engine.activeMode == .stat)
+            annunciator("MAT", active: engine.activeMode == .matrix)
+            annunciator("VCT", active: engine.activeMode == .vector)
             annunciator(engine.baseNType.rawValue, active: engine.activeMode == .baseN)
             annunciator("D", active: engine.angleUnit == .deg)
             annunciator("R", active: engine.angleUnit == .rad)
@@ -300,6 +328,7 @@ struct ContentView: View {
             annunciator("Fix", active: isFixFormat)
             annunciator("Sci", active: isSciFormat)
             annunciator("Math", active: engine.isMthIO)
+            annunciator("Disp", active: engine.isShowingIntermediate)
             annunciator("▲", active: !engine.history.isEmpty)
             annunciator("▼", active: engine.historyIndex >= 0)
         }
@@ -341,17 +370,38 @@ struct ContentView: View {
                             slot: .root,
                             cursor: engine.astManager.cursor,
                             fontSize: 16,
-                            showCursor: true
+                            // The blinking cursor disappears once a result is shown
+                            showCursor: !engine.isShowingResult,
+                            isNearCapacity: engine.astManager.isNearCapacity,
+                            onCursorMove: { path in engine.moveCursor(to: path) }
                         )
                         .padding(.vertical, 2)
                     }
                 } else {
-                    Text(renderedExpression)
-                        .font(.system(size: 16, weight: .medium, design: .monospaced))
-                        .foregroundColor(CasioTheme.lcdTextActive)
-                        .lineLimit(1)
+                    // LineIO: map a tap to the nearest character position.
+                    MathText(
+                        engine.isShowingResult ? engine.expression : renderedExpression,
+                        fontSize: 16,
+                        weight: .medium
+                    )
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onEnded { value in
+                                let charWidth: CGFloat = 16 * 0.6
+                                let idx = Int(value.location.x / charWidth)
+                                engine.setLinearCursorPosition(idx)
+                            }
+                    )
                 }
                 Spacer(minLength: 0)
+                // Continuation marker when the input expression exceeds the
+                // visible LCD width (reference §8.2).
+                if engine.expression.count > 22 {
+                    Text("▶")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(CasioTheme.lcdTextActive)
+                }
             }
             .frame(minHeight: 38, maxHeight: 46, alignment: .leading)
 
@@ -368,28 +418,46 @@ struct ContentView: View {
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                 } else {
-                    Spacer(minLength: 0)
-                    if let exact = engine.exactResult, !engine.isShowingDecimal, engine.isMthIO {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            MathASTView(
-                                nodes: exact.toMathNodes(),
-                                slot: .root,
-                                cursor: nil,
-                                fontSize: 20,
-                                showCursor: false
-                            )
-                            .padding(.vertical, 2)
-                        }
-                    } else {
-                        Text(engine.result)
-                            .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                    // Continuation marker for a result wider than the LCD.
+                    // Right-aligned long results clip on the left.
+                    if engine.result.count > 13 {
+                        Text("◀")
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundColor(CasioTheme.lcdTextActive)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.3)
+                    }
+                    Spacer(minLength: 0)
+                    if let mat = engine.matrixResult {
+                        MatrixResultView(matrix: mat)
+                    } else if let vec = engine.vectorResult {
+                        Text(vec.linearString)
+                            .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            .foregroundColor(CasioTheme.lcdTextActive)
+                    } else if let exact = engine.exactResult, !engine.isShowingDecimal, !engine.isShowingDMS, engine.isMthIO {
+                        MathASTView(
+                            nodes: exact.toMathNodes(mixed: engine.fractionDisplay == .mixed),
+                            slot: .root,
+                            cursor: nil,
+                            fontSize: 20,
+                            showCursor: false
+                        )
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.vertical, 2)
+                    } else {
+                        // Long results scroll horizontally but stay right-aligned
+                        // while they fit (reference §8.2).
+                        GeometryReader { geo in
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 0) {
+                                    Spacer(minLength: 0)
+                                    MathText(engine.result, fontSize: 26, weight: .semibold)
+                                }
+                                .frame(minWidth: geo.size.width)
+                            }
+                        }
                     }
                 }
             }
-            .frame(minHeight: 36, maxHeight: 44, alignment: .trailing)
+            .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 44, alignment: .trailing)
         }
     }
 
@@ -403,7 +471,9 @@ struct ContentView: View {
         let safePos = min(max(0, pos), chars.count)
         let prefix = String(chars[0..<safePos])
         let suffix = String(chars[safePos..<chars.count])
-        return prefix + "_" + suffix
+        // INS/overwrite mode uses a block cursor on the LCD.
+        let cursor = engine.isOverwriteMode ? "▮" : "_"
+        return prefix + cursor + suffix
     }
 
     // MARK: - Menu Display View
@@ -430,17 +500,28 @@ struct ContentView: View {
                     Text("5:Gra   6:Fix    7:Sci 8:Norm")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
-                    Text("▼ Next Page")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    Text("[\(engine.angleUnit.rawValue.uppercased()) \(engine.mathOutputStyle == .mathO ? "MathO" : "LineO") Norm\(engine.normMode.rawValue)] ▼Next")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
                 } else {
                     Text("1:ab/c 2:d/c 3:CMPLX 4:STAT")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
-                    Text("5:Disp")
+                    Text("5:Disp 6:CONT")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
+                    Text("[\(engine.fractionDisplay.rawValue) \(engine.complexFormat.rawValue) FREQ:\(engine.statFrequencyEnabled ? "ON" : "OFF")]")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(CasioTheme.lcdTextActive)
                 }
+
+            case .mthIOMenu:
+                Text("MthIO")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("1:MathO  2:LineO")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
 
             case .fixPrompt:
                 Text("Fix 0 ~ 9 ?")
@@ -449,6 +530,38 @@ struct ContentView: View {
 
             case .sciPrompt:
                 Text("Sci 0 ~ 9 ?")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .normPrompt:
+                Text("Norm")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("1:Norm 1  2:Norm 2")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .dispFormatMenu:
+                Text("Disp")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("1:Dot  2:Comma")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .statFreqMenu:
+                Text("STAT FREQ")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("1:ON  2:OFF")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .contrastPrompt:
+                Text("Contrast (0 ~ 9)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("\(codeBuffer.isEmpty ? String(engine.contrastLevel) : codeBuffer)_")
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
@@ -474,11 +587,26 @@ struct ContentView: View {
                 Text("1:1-VAR  2:A+BX  3:_+CX²")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
-                Text("4:ln X   5:e^X   6:A·B^X")
+                MathText("4:ln X   5:e^X   6:A·B^X", fontSize: 11, weight: .bold)
+                MathText("7:A·X^B  8:1/X", fontSize: 11, weight: .bold)
+
+            case .statSubMenu:
+                Text(engine.isPairedStat ? "1:A  2:B  3:r  4:ymax" : "1:x̄  2:Σx  3:min  4:max")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
-                Text("7:A·X^B  8:1/X")
+                Text(engine.isPairedStat ? "5:σx  6:Data" : "5:σx  6:Data")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .statDataEditor(let row):
+                Text("STAT  X\(engine.isPairedStat ? "/Y" : "")  row \(row + 1)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("\(codeBuffer)_")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("n=\(engine.statData.count)  [=]next  [AC]done")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
             case .cmplxMenu:
@@ -486,6 +614,14 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
                 Text("4:▶r∠θ   5:▶a+bi")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .cmplxFormatMenu:
+                Text("CMPLX")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("1:a+bi   2:r∠θ")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
@@ -505,6 +641,34 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
+            case .matrixDimSelect, .matrixDataSelect:
+                Text("1:MatA  2:MatB  3:MatC")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("[AC]:Cancel")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .matrixDimPrompt(let name):
+                Text("\(name)  m×n?")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("1:3×3 2:3×2 3:3×1 4:2×3")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("5:2×2 6:2×1 7:1×3 8:1×2 9:1×1")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("\(codeBuffer.isEmpty ? engine.dimsString(for: name) : codeBuffer)_")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("[=]:OK  [AC]:Cancel")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .matrixCellEditor(let name, let row, let col):
+                matrixCellEditorView(name: name, row: row, col: col)
+
             case .vectorMenu:
                 Text("1:Dim  2:Data 3:VctA 4:VctB")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -513,9 +677,29 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
-            case .mthIOMenu:
-                Text("1:MathO    2:LineO")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+            case .vectorDimSelect, .vectorDataSelect:
+                Text("1:VctA  2:VctB  3:VctC")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("[AC]:Cancel")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .vectorDimPrompt(let name):
+                Text("\(name)  Dim? (2 or 3)")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("\(codeBuffer.isEmpty ? "2" : codeBuffer)_")
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+
+            case .vectorComponentEditor(let name, let index):
+                let v = engine.vectorValue(for: name)
+                Text("\(name)[\(index + 1)] = \(v.dim > index ? CasioEvaluator.format(v[index], format: .norm) : "")_")
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(CasioTheme.lcdTextActive)
+                Text("Vct\(name.suffix(1))  \(v.linearString)")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .foregroundColor(CasioTheme.lcdTextActive)
 
             case .authenticityView:
@@ -550,9 +734,7 @@ struct ContentView: View {
                     Text("f(X) =")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundColor(CasioTheme.lcdTextActive)
-                    Text("\(engine.expression)_")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(CasioTheme.lcdTextActive)
+                    MathText("\(engine.expression)_", fontSize: 14, weight: .bold)
                 } else if step == 1 {
                     Text("Start?")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -619,6 +801,37 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    /// fx-991ES style matrix grid editor: the whole matrix is shown with the
+    /// active cell highlighted and its typed value in place.
+    private func matrixCellEditorView(name: String, row: Int, col: Int) -> some View {
+        let m = engine.matrixValue(for: name)
+        let cellWidth: CGFloat = m.cols >= 3 ? 44 : 64
+        let fontSize: CGFloat = m.cols >= 3 ? 10 : 12
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("\(name)  \(m.rows)×\(m.cols)")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundColor(CasioTheme.lcdTextActive)
+            ForEach(1...max(1, m.rows), id: \.self) { r in
+                HStack(spacing: 4) {
+                    ForEach(1...max(1, m.cols), id: \.self) { c in
+                        let isCurrent = (r == row && c == col)
+                        let base = CasioEvaluator.format(engine.matrixCellValue(name: name, row: r, col: c), format: engine.displayFormat)
+                        let text = isCurrent ? (codeBuffer.isEmpty ? base + "_" : codeBuffer + "_") : base
+                        Text(isCurrent ? "[\(text)]" : text)
+                            .font(.system(size: fontSize, weight: isCurrent ? .heavy : .semibold, design: .monospaced))
+                            .foregroundColor(CasioTheme.lcdTextActive)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.4)
+                            .frame(width: isCurrent ? cellWidth + 10 : cellWidth, alignment: .center)
+                    }
+                }
+            }
+            Text("[=]:Next  [AC]:Exit")
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundColor(CasioTheme.lcdTextActive)
+        }
+    }
+
     // MARK: - Keypad Matrix
 
     private var casioKeypad: some View {
@@ -653,46 +866,49 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // CALC key
-                wingButton(shift: "SOLVE", alpha: "=", label: "CALC") {
-                    if engine.shiftActive {
-                        engine.shiftActive = false
-                        engine.startSolve()
-                    } else if engine.alphaActive {
-                        engine.alphaActive = false
-                        if engine.isMthIO {
-                            engine.insertASTText("=")
+                // CALC and ∫ sit side by side in the left wing (fx-991ES PLUS)
+                HStack(spacing: 4) {
+                    wingButton(shift: "SOLVE", alpha: "=", label: "CALC") {
+                        if engine.shiftActive {
+                            engine.shiftActive = false
+                            engine.startSolve()
+                        } else if engine.alphaActive {
+                            engine.alphaActive = false
+                            if engine.isMthIO {
+                                engine.insertASTText("=")
+                            } else {
+                                engine.insert("=")
+                            }
                         } else {
-                            engine.insert("=")
+                            engine.startCalc()
                         }
-                    } else {
-                        engine.startCalc()
                     }
-                }
 
-                // THE INTEGRATION KEY: ∫ □ dx
-                wingButtonCustom(shift: "d/dx", alpha: ":") {
-                    IntegrationKeyFace()
-                } action: {
-                    if engine.shiftActive {
-                        engine.shiftActive = false
-                        if engine.isMthIO {
-                            engine.insertASTFunction("d/dx")
+                    // ∫ key: integral template with stacked limit boxes,
+                    // matching the fx-991ES PLUS key cap.
+                    wingButtonCustom(shiftFraction: true, alpha: ":") {
+                        IntegrationKeyFace()
+                    } action: {
+                        if engine.shiftActive {
+                            engine.shiftActive = false
+                            if engine.isMthIO {
+                                engine.insertASTDerivative()
+                            } else {
+                                engine.insert("d/dx(")
+                            }
+                        } else if engine.alphaActive {
+                            engine.alphaActive = false
+                            if engine.isMthIO {
+                                engine.insertASTText(":")
+                            } else {
+                                engine.insert(":")
+                            }
                         } else {
-                            engine.insert("d/dx(")
-                        }
-                    } else if engine.alphaActive {
-                        engine.alphaActive = false
-                        if engine.isMthIO {
-                            engine.insertASTText(":")
-                        } else {
-                            engine.insert(":")
-                        }
-                    } else {
-                        if engine.isMthIO {
-                            engine.insertASTIntegral()
-                        } else {
-                            engine.insert("∫(")
+                            if engine.isMthIO {
+                                engine.insertASTIntegral()
+                            } else {
+                                engine.insert("∫(")
+                            }
                         }
                     }
                 }
@@ -724,42 +940,43 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // x⁻¹ key
-                wingButton(shift: "x!", alpha: "", label: "x⁻¹") {
-                    if engine.shiftActive {
-                        engine.shiftActive = false
-                        if engine.isMthIO {
-                            engine.insertASTText("!")
+                // x⁻¹ and logₐb sit side by side in the right wing
+                HStack(spacing: 4) {
+                    wingButton(shift: "x!", alpha: "", label: "x⁻¹") {
+                        if engine.shiftActive {
+                            engine.shiftActive = false
+                            if engine.isMthIO {
+                                engine.insertASTText("!")
+                            } else {
+                                engine.insert("!")
+                            }
                         } else {
-                            engine.insert("!")
-                        }
-                    } else {
-                        if engine.isMthIO {
-                            engine.insertASTExponent()
-                            engine.insertASTText("-1")
-                            engine.moveCursorRight()
-                        } else {
-                            engine.insert("^(-1)")
+                            if engine.isMthIO {
+                                engine.insertASTExponent()
+                                engine.insertASTText("-1")
+                                engine.moveCursorRight()
+                            } else {
+                                engine.insert("^(-1)")
+                            }
                         }
                     }
-                }
 
-                // log_■ ■ key
-                wingButtonCustom(shift: "Σ", alpha: "") {
-                    LogBaseKeyFace()
-                } action: {
-                    if engine.shiftActive {
-                        engine.shiftActive = false
-                        if engine.isMthIO {
-                            engine.insertASTSummation()
+                    wingButtonCustom(shift: "Σ", alpha: "") {
+                        LogBaseKeyFace()
+                    } action: {
+                        if engine.shiftActive {
+                            engine.shiftActive = false
+                            if engine.isMthIO {
+                                engine.insertASTSummation()
+                            } else {
+                                engine.insert("Σ(")
+                            }
                         } else {
-                            engine.insert("Σ(")
-                        }
-                    } else {
-                        if engine.isMthIO {
-                            engine.insertASTLogBase()
-                        } else {
-                            engine.insert("log(")
+                            if engine.isMthIO {
+                                engine.insertASTLogBase()
+                            } else {
+                                engine.insert("log(")
+                            }
                         }
                     }
                 }
@@ -838,7 +1055,11 @@ struct ContentView: View {
             HStack {
                 Button {
                     CasioHaptics.tap()
-                    engine.moveCursorLeft()
+                    if case .matrixCellEditor = engine.menuState {
+                        engine.moveMatrixCell(dx: -1, dy: 0)
+                    } else {
+                        engine.moveCursorLeft()
+                    }
                 } label: {
                     Image(systemName: "arrowtriangle.left.fill")
                         .font(.system(size: 8))
@@ -848,7 +1069,11 @@ struct ContentView: View {
                 Spacer()
                 Button {
                     CasioHaptics.tap()
-                    engine.moveCursorRight()
+                    if case .matrixCellEditor = engine.menuState {
+                        engine.moveMatrixCell(dx: 1, dy: 0)
+                    } else {
+                        engine.moveCursorRight()
+                    }
                 } label: {
                     Image(systemName: "arrowtriangle.right.fill")
                         .font(.system(size: 8))
@@ -875,7 +1100,9 @@ struct ContentView: View {
     }
 
     private func handleReplayUp() {
-        if case .eqnSolutionView(let solutions, let index) = engine.menuState {
+        if case .matrixCellEditor = engine.menuState {
+            engine.moveMatrixCell(dx: 0, dy: -1)
+        } else if case .eqnSolutionView(let solutions, let index) = engine.menuState {
             let prev = max(0, index - 1)
             engine.menuState = .eqnSolutionView(solutions: solutions, index: prev)
         } else if case .tablePrompt(let step) = engine.menuState, step == 4 {
@@ -890,7 +1117,9 @@ struct ContentView: View {
     }
 
     private func handleReplayDown() {
-        if case .eqnSolutionView(let solutions, let index) = engine.menuState {
+        if case .matrixCellEditor = engine.menuState {
+            engine.moveMatrixCell(dx: 0, dy: 1)
+        } else if case .eqnSolutionView(let solutions, let index) = engine.menuState {
             let next = min(solutions.count - 1, index + 1)
             engine.menuState = .eqnSolutionView(solutions: solutions, index: next)
         } else if case .tablePrompt(let step) = engine.menuState, step == 4 {
@@ -910,14 +1139,15 @@ struct ContentView: View {
 
     private var functionGrid: some View {
         VStack(spacing: 4) {
-            // Row 1: ■/□, √□, x², x^■, log, ln
+            // Row 1: ■/□, √□, x², xˣ (power), log, ln
             HStack(spacing: 4) {
-                funcKeyCustom(shift: "a b/c ⇔ d/c", alpha: "") {
+                funcKeyCustom(shift: "d/c", alpha: "") {
                     FractionKeyFace()
                 } action: {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.toggleSD()
+                        // SHIFT + fraction = d/c: improper-fraction result format command
+                        engine.applyImproperFractionFormat()
                     } else if engine.isMthIO {
                         engine.insertASTFraction()
                     } else {
@@ -964,7 +1194,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                funcKeyCustom(shift: "ˣ√", alpha: "HEX") {
+                funcKeyCustom(shift: "ʸ√x", alpha: "HEX") {
                     PowerKeyFace()
                 } action: {
                     if engine.activeMode == .baseN {
@@ -984,7 +1214,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                funcKey("log", shift: "10^■", alpha: "BIN") {
+                funcKey("log", shift: "10ˣ", alpha: "BIN") {
                     if engine.activeMode == .baseN {
                         engine.setBaseN(.bin)
                     } else if engine.shiftActive {
@@ -1003,7 +1233,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                funcKey("ln", shift: "e^■", alpha: "OCT") {
+                funcKey("ln", shift: "eˣ", alpha: "OCT") {
                     if engine.activeMode == .baseN {
                         engine.setBaseN(.oct)
                     } else if engine.shiftActive {
@@ -1026,7 +1256,9 @@ struct ContentView: View {
 
             // Row 2: (-), ° ' ", hyp, sin, cos, tan
             HStack(spacing: 4) {
-                funcKey("(-)", shift: "∠", alpha: "A") {
+                // ∠ is a purple CMPLX-mode marking, not a yellow SHIFT legend.
+                funcKey("(-)", shift: "∠", shiftColor: .purple, alpha: "A") {
+                    if interceptVariableCapture("A") { return }
                     if engine.shiftActive {
                         engine.shiftActive = false
                         engine.insert("∠")
@@ -1041,7 +1273,8 @@ struct ContentView: View {
                         engine.insert("-")
                     }
                 }
-                funcKey("° ' \"", shift: "FACT", alpha: "B") {
+                funcKey("° ' \"", alpha: "B") {
+                    if interceptVariableCapture("B") { return }
                     if engine.shiftActive {
                         engine.shiftActive = false
                         engine.primeFactorize()
@@ -1049,10 +1282,13 @@ struct ContentView: View {
                         engine.alphaActive = false
                         handleVariableKey("B")
                     } else {
-                        engine.convertToDMS()
+                        // Input: insert sexagesimal marker (d°m's" syntax).
+                        // On a result: toggle decimal ⇔ DMS display (manual p.23).
+                        engine.insertDMSMark()
                     }
                 }
                 funcKey("hyp", shift: "Abs", alpha: "C") {
+                    if interceptVariableCapture("C") { return }
                     if engine.alphaActive {
                         engine.alphaActive = false
                         handleVariableKey("C")
@@ -1064,17 +1300,24 @@ struct ContentView: View {
                             engine.insert("abs(")
                         }
                     } else {
-                        if engine.isMthIO {
-                            engine.insertASTFunction("sinh")
-                        } else {
-                            engine.insert("sinh(")
-                        }
+                        // hyp waits for sin/cos/tan like the real key flow
+                        engine.waitingForHyp.toggle()
                     }
                 }
                 funcKey("sin", shift: "sin⁻¹", alpha: "D") {
+                    if interceptVariableCapture("D") { return }
                     if engine.alphaActive {
                         engine.alphaActive = false
                         handleVariableKey("D")
+                    } else if engine.waitingForHyp {
+                        engine.waitingForHyp = false
+                        let inverse = engine.shiftActive
+                        engine.shiftActive = false
+                        if engine.isMthIO {
+                            engine.insertASTFunction(inverse ? "sinh⁻¹" : "sinh")
+                        } else {
+                            engine.insert(inverse ? "sinh⁻¹(" : "sinh(")
+                        }
                     } else if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
@@ -1091,9 +1334,19 @@ struct ContentView: View {
                     }
                 }
                 funcKey("cos", shift: "cos⁻¹", alpha: "E") {
+                    if interceptVariableCapture("E") { return }
                     if engine.alphaActive {
                         engine.alphaActive = false
                         handleVariableKey("E")
+                    } else if engine.waitingForHyp {
+                        engine.waitingForHyp = false
+                        let inverse = engine.shiftActive
+                        engine.shiftActive = false
+                        if engine.isMthIO {
+                            engine.insertASTFunction(inverse ? "cosh⁻¹" : "cosh")
+                        } else {
+                            engine.insert(inverse ? "cosh⁻¹(" : "cosh(")
+                        }
                     } else if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
@@ -1110,9 +1363,19 @@ struct ContentView: View {
                     }
                 }
                 funcKey("tan", shift: "tan⁻¹", alpha: "F") {
+                    if interceptVariableCapture("F") { return }
                     if engine.alphaActive {
                         engine.alphaActive = false
                         handleVariableKey("F")
+                    } else if engine.waitingForHyp {
+                        engine.waitingForHyp = false
+                        let inverse = engine.shiftActive
+                        engine.shiftActive = false
+                        if engine.isMthIO {
+                            engine.insertASTFunction(inverse ? "tanh⁻¹" : "tanh")
+                        } else {
+                            engine.insert(inverse ? "tanh⁻¹(" : "tanh(")
+                        }
                     } else if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
@@ -1135,34 +1398,32 @@ struct ContentView: View {
                 funcKey("RCL", shift: "STO", alpha: "") {
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        waitingForSto = true
+                        engine.waitingForSto = true
                     } else {
-                        if engine.isMthIO {
-                            engine.insertASTText("A")
-                        } else {
-                            engine.insert("A")
-                        }
+                        // RCL captures the next variable key to recall its value
+                        engine.waitingForRcl = true
                     }
                 }
                 funcKey("ENG", shift: "←", alpha: "i") {
-                    if engine.shiftActive {
-                        engine.shiftActive = false
-                        engine.cycleEng()
-                    } else if engine.alphaActive || engine.activeMode == .cmplx {
+                    if engine.alphaActive || engine.activeMode == .cmplx {
                         engine.alphaActive = false
                         if engine.isMthIO {
                             engine.insertASTText("i")
                         } else {
                             engine.insert("i")
                         }
+                    } else if engine.shiftActive {
+                        engine.shiftActive = false
+                        // SHIFT+ENG (←): shift the decimal point left
+                        engine.shiftEng(left: true)
                     } else {
-                        engine.cycleEng()
+                        // ENG: shift the decimal point right, three places at a time
+                        engine.shiftEng(left: false)
                     }
                 }
-                funcKey("(", shift: "%", alpha: "X") {
+                funcKey("(", shift: "%", alpha: "") {
                     if engine.alphaActive {
                         engine.alphaActive = false
-                        handleVariableKey("X")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
@@ -1178,10 +1439,11 @@ struct ContentView: View {
                         }
                     }
                 }
-                funcKey(")", shift: ",", alpha: "Y") {
+                funcKey(")", shift: ",", alpha: "X") {
+                    if interceptVariableCapture("X") { return }
                     if engine.alphaActive {
                         engine.alphaActive = false
-                        handleVariableKey("Y")
+                        handleVariableKey("X")
                     } else if engine.shiftActive {
                         engine.shiftActive = false
                         if engine.isMthIO {
@@ -1197,10 +1459,21 @@ struct ContentView: View {
                         }
                     }
                 }
-                funcKey("S⇔D", shift: "a b/c ⇔ d/c", alpha: "") {
-                    engine.toggleSD()
+                funcKey("S⇔D", shift: "ab/c⇔d/c", alpha: "Y") {
+                    if interceptVariableCapture("Y") { return }
+                    if engine.alphaActive {
+                        engine.alphaActive = false
+                        handleVariableKey("Y")
+                    } else if engine.shiftActive {
+                        engine.shiftActive = false
+                        // SHIFT+S⇔D: improper ⇔ mixed fraction display
+                        engine.toggleImproperMixed()
+                    } else {
+                        engine.toggleSD()
+                    }
                 }
                 funcKey("M+", shift: "M-", alpha: "M") {
+                    if interceptVariableCapture("M") { return }
                     if engine.alphaActive {
                         engine.alphaActive = false
                         handleVariableKey("M")
@@ -1216,16 +1489,16 @@ struct ContentView: View {
     }
 
     private func handleVariableKey(_ varName: Character) {
-        if waitingForSto {
-            waitingForSto = false
-            engine.storeToVariable(varName)
-        } else {
-            if engine.isMthIO {
-                engine.insertASTText(String(varName))
-            } else {
-                engine.insert(String(varName))
-            }
+        engine.handleVariableSelection(varName)
+    }
+
+    /// STO / RCL capture the next variable key without ALPHA (real key flow)
+    private func interceptVariableCapture(_ varName: Character) -> Bool {
+        if engine.waitingForSto || engine.waitingForRcl {
+            engine.handleVariableSelection(varName)
+            return true
         }
+        return false
     }
 
     // MARK: - Main Number Pad (4 Rows × 5 Keys)
@@ -1247,7 +1520,10 @@ struct ContentView: View {
                     height: 35
                 ) {
                     CasioHaptics.tap()
-                    if !codeBuffer.isEmpty {
+                    if engine.shiftActive {
+                        engine.shiftActive = false
+                        engine.toggleInsertOverwrite()
+                    } else if !codeBuffer.isEmpty {
                         codeBuffer.removeLast()
                     } else {
                         engine.delete()
@@ -1269,11 +1545,9 @@ struct ContentView: View {
                     } else if engine.menuState != .none {
                         engine.menuState = .none
                         codeBuffer = ""
-                        waitingForSto = false
                     } else {
                         engine.clearAll()
                         codeBuffer = ""
-                        waitingForSto = false
                     }
                 }
             }
@@ -1291,7 +1565,7 @@ struct ContentView: View {
             HStack(spacing: 5) {
                 digitKey("1", shift: "STAT")
                 digitKey("2", shift: "CMPLX")
-                digitKey("3", shift: "BASE")
+                digitKey("3", shift: "BASE-N")
                 opKey("+", shift: "Pol")
                 opKey("−", shift: "Rec")
             }
@@ -1299,7 +1573,7 @@ struct ContentView: View {
             // Row 4: 0, ., ×10ˣ, Ans, =
             HStack(spacing: 5) {
                 digitKey("0", shift: "Rnd")
-                digitKey(".", shift: "Ran#", alpha: "RanInt")
+                digitKey(".", shift: "Ran#", alpha: "RanInt#")
                 casioButton(label: "×10ˣ", shiftLabel: "π", alphaLabel: "e", height: 35) {
                     CasioHaptics.tap()
                     if engine.shiftActive {
@@ -1318,7 +1592,11 @@ struct ContentView: View {
                         }
                     } else {
                         if engine.isMthIO {
-                            engine.insertASTText("×10^")
+                            // Build a real exponent template so the LCD shows ×10ⁿ
+                            // with a raised exponent instead of a literal caret.
+                            engine.insertASTText("×")
+                            engine.insertASTText("10")
+                            engine.insertASTExponent()
                         } else {
                             engine.insert("×10^")
                         }
@@ -1328,7 +1606,8 @@ struct ContentView: View {
                     CasioHaptics.tap()
                     if engine.shiftActive {
                         engine.shiftActive = false
-                        engine.insert("°")
+                        // DRG▶: convert the displayed result between Deg/Rad/Gra
+                        engine.convertResultAngleUnit()
                     } else {
                         if engine.isMthIO {
                             engine.insertASTText("Ans")
@@ -1354,6 +1633,26 @@ struct ContentView: View {
                         let val = Double(codeBuffer) ?? 0
                         codeBuffer = ""
                         engine.advanceEqnCoeff(val: val)
+                    case .statDataEditor(let row):
+                        let val = Double(codeBuffer) ?? 0
+                        codeBuffer = ""
+                        engine.commitStatValue(val, row: row)
+                    case .matrixDimPrompt:
+                        let buf = codeBuffer
+                        codeBuffer = ""
+                        engine.confirmMatrixDim(buffer: buf)
+                    case .matrixCellEditor:
+                        let val = Double(codeBuffer) ?? 0
+                        codeBuffer = ""
+                        engine.commitMatrixCell(val: val)
+                    case .vectorDimPrompt(let name):
+                        let dim = Int(codeBuffer) ?? 0
+                        codeBuffer = ""
+                        engine.confirmVectorDim(name, dim: dim)
+                    case .vectorComponentEditor:
+                        let val = Double(codeBuffer) ?? 0
+                        codeBuffer = ""
+                        engine.commitVectorComponent(val)
                     case .tablePrompt(let step):
                         if step == 0 {
                             engine.advanceTablePrompt()
@@ -1470,13 +1769,16 @@ struct ContentView: View {
 
     private func wingButtonCustom<Content: View>(
         shift: String = "",
+        shiftFraction: Bool = false,
         alpha: String = "",
         @ViewBuilder content: () -> Content,
         action: @escaping () -> Void
     ) -> some View {
         VStack(spacing: 1) {
             HStack {
-                if !shift.isEmpty {
+                if shiftFraction {
+                    DerivativeShiftLabel()
+                } else if !shift.isEmpty {
                     Text(shift)
                         .font(.system(size: 7.5, weight: .bold))
                         .foregroundColor(CasioTheme.inkShift)
@@ -1513,6 +1815,7 @@ struct ContentView: View {
     private func funcKey(
         _ label: String,
         shift: String = "",
+        shiftColor: Color = CasioTheme.inkShift,
         alpha: String = "",
         action: @escaping () -> Void
     ) -> some View {
@@ -1521,7 +1824,7 @@ struct ContentView: View {
                 if !shift.isEmpty {
                     Text(shift)
                         .font(.system(size: 7, weight: .bold))
-                        .foregroundColor(CasioTheme.inkShift)
+                        .foregroundColor(shiftColor)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -1628,7 +1931,11 @@ struct ContentView: View {
                 }
                 return
 
-            case .eqnCoeffPrompt, .calcPrompt, .solvePrompt:
+            case .eqnCoeffPrompt, .calcPrompt, .solvePrompt, .statDataEditor:
+                codeBuffer.append(digit)
+                return
+
+            case .matrixDimPrompt, .matrixCellEditor, .vectorDimPrompt, .vectorComponentEditor:
                 codeBuffer.append(digit)
                 return
 
@@ -1662,16 +1969,20 @@ struct ContentView: View {
                     engine.menuState = .vectorMenu
                     return
                 case "STAT":
-                    engine.menuState = .statTypeMenu
+                    // SHIFT+1 selects the type when entering STAT; once in STAT
+                    // it opens the statistics calculation menu (manual §6.3).
+                    engine.menuState = engine.activeMode == .stat ? .statSubMenu : .statTypeMenu
                     return
                 case "CMPLX":
                     engine.menuState = .cmplxMenu
                     return
                 case "BASE":
-                    engine.setBaseN(.bin)
+                    // SHIFT+3 enters BASE-N mode (decimal base) like the real menu
+                    engine.enterBaseNMode()
                     return
                 case "Rnd":
-                    engine.insert("round(")
+                    // SHIFT+0 rounds the displayed value to the display digits
+                    engine.roundDisplayed()
                     return
                 case "Ran#":
                     engine.insert("Ran#")
@@ -1683,8 +1994,12 @@ struct ContentView: View {
             // Handle ALPHA functions for digit keys
             if engine.alphaActive {
                 engine.alphaActive = false
-                if alpha == "RanInt" {
-                    engine.insert("RanInt(")
+                if alpha.hasPrefix("RanInt") {
+                    if engine.isMthIO {
+                        engine.insertASTFunction("RanInt")
+                    } else {
+                        engine.insert("RanInt(")
+                    }
                     return
                 }
             }
@@ -1720,6 +2035,9 @@ struct ContentView: View {
                 default:
                     if engine.isMthIO { engine.insertASTText(symbol) } else { engine.insert(symbol) }
                 }
+            } else if case .matrixDimPrompt = engine.menuState, symbol == "×" {
+                // m×n entry inside the matrix dimension prompt
+                codeBuffer.append("×")
             } else {
                 if engine.isMthIO {
                     engine.insertASTText(symbol)

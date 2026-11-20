@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
 set -e
-swiftc Sources/greeter/Calculator.swift Sources/greeter/MathAST.swift Sources/greeter/ExactMath.swift Tests/CasioEvaluatorTests.swift -o /tmp/test_runner
+swiftc \
+  Sources/greeter/Calculator.swift \
+  Sources/greeter/CalculatorModes.swift \
+  Sources/greeter/ComplexMode.swift \
+  Sources/greeter/VectorMode.swift \
+  Sources/greeter/StatMode.swift \
+  Sources/greeter/BaseNMode.swift \
+  Sources/greeter/EquationMode.swift \
+  Sources/greeter/CalcSolveMode.swift \
+  Sources/greeter/SetupMode.swift \
+  Sources/greeter/TableMode.swift \
+  Sources/greeter/MatrixMode.swift \
+  Sources/greeter/MathAST.swift \
+  Sources/greeter/ExactMath.swift \
+  Sources/greeter/MatrixEvaluator.swift \
+  Tests/CasioEvaluatorTests.swift \
+  -o /tmp/test_runner
 /tmp/test_runner

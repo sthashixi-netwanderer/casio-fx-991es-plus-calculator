@@ -9,4 +9,5 @@ DerivedData/
 
 /xtool
 .creep/
+.video_agent/
 main

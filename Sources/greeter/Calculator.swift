@@ -47,48 +47,7 @@ public enum DisplayFormat: Equatable, Sendable {
     case mixedFraction
 }
 
-public enum CalcMode: String, CaseIterable, Sendable {
-    case comp = "COMP"
-    case cmplx = "CMPLX"
-    case stat = "STAT"
-    case baseN = "BASE-N"
-    case eqn = "EQN"
-    case matrix = "MATRIX"
-    case table = "TABLE"
-    case vector = "VECTOR"
-}
-
-public enum BaseNType: String, CaseIterable, Sendable {
-    case dec = "d"
-    case hex = "H"
-    case bin = "b"
-    case oct = "o"
-}
-
-public enum MenuState: Equatable, Sendable {
-    case none
-    case modeMenu
-    case setupMenu(page: Int)
-    case mthIOMenu
-    case fixPrompt
-    case sciPrompt
-    case clrPrompt
-    case constPrompt
-    case convPrompt
-    case statTypeMenu
-    case statSubMenu
-    case cmplxMenu
-    case eqnTypeMenu
-    case eqnCoeffPrompt(type: Int, coeffName: String, coeffIndex: Int)
-    case eqnSolutionView(solutions: [String], index: Int)
-    case matrixMenu
-    case vectorMenu
-    case tablePrompt(step: Int)
-    case calcPrompt(varName: Character, remainingVars: [Character])
-    case solvePrompt(initialGuess: Double)
-    case solveResult(root: Double, residual: Double)
-    case authenticityView
-}
+// Mode, base, complex-format and menu definitions live in CalculatorModes.swift
 
 public struct EvalResult: Sendable {
     public let value: Double?
@@ -102,81 +61,7 @@ public struct EvalResult: Sendable {
     }
 }
 
-// MARK: - Complex Number Representation
-
-public struct Complex: Equatable, CustomStringConvertible, Sendable {
-    public var real: Double
-    public var imag: Double
-
-    public init(real: Double, imag: Double = 0) {
-        self.real = real
-        self.imag = imag
-    }
-
-    public static let zero = Complex(real: 0, imag: 0)
-    public static let i = Complex(real: 0, imag: 1)
-
-    public var magnitude: Double {
-        Foundation.sqrt(real * real + imag * imag)
-    }
-
-    public func argument(angleUnit: AngleUnit = .deg) -> Double {
-        let rad = Foundation.atan2(imag, real)
-        return angleUnit.fromRadians(rad)
-    }
-
-    public var conjugate: Complex {
-        Complex(real: real, imag: -imag)
-    }
-
-    public static func + (lhs: Complex, rhs: Complex) -> Complex {
-        Complex(real: lhs.real + rhs.real, imag: lhs.imag + rhs.imag)
-    }
-
-    public static func - (lhs: Complex, rhs: Complex) -> Complex {
-        Complex(real: lhs.real - rhs.real, imag: lhs.imag - rhs.imag)
-    }
-
-    public static func * (lhs: Complex, rhs: Complex) -> Complex {
-        Complex(
-            real: lhs.real * rhs.real - lhs.imag * rhs.imag,
-            imag: lhs.real * rhs.imag + lhs.imag * rhs.real
-        )
-    }
-
-    public static func / (lhs: Complex, rhs: Complex) -> Complex? {
-        let denom = rhs.real * rhs.real + rhs.imag * rhs.imag
-        guard denom != 0 else { return nil }
-        return Complex(
-            real: (lhs.real * rhs.real + lhs.imag * rhs.imag) / denom,
-            imag: (lhs.imag * rhs.real - lhs.real * rhs.imag) / denom
-        )
-    }
-
-    public var description: String {
-        formatRectangular()
-    }
-
-    public func formatRectangular() -> String {
-        if abs(imag) < 1e-12 {
-            return CasioEvaluator.format(real, format: .norm)
-        }
-        if abs(real) < 1e-12 {
-            let iStr = abs(imag - 1.0) < 1e-12 ? "i" : (abs(imag + 1.0) < 1e-12 ? "-i" : "\(CasioEvaluator.format(imag, format: .norm))i")
-            return iStr
-        }
-        let sign = imag >= 0 ? "+" : "−"
-        let absImag = abs(imag)
-        let imagPart = abs(absImag - 1.0) < 1e-12 ? "i" : "\(CasioEvaluator.format(absImag, format: .norm))i"
-        return "\(CasioEvaluator.format(real, format: .norm))\(sign)\(imagPart)"
-    }
-
-    public func formatPolar(angleUnit: AngleUnit) -> String {
-        let r = magnitude
-        let theta = argument(angleUnit: angleUnit)
-        return "\(CasioEvaluator.format(r, format: .norm))∠\(CasioEvaluator.format(theta, format: .norm))"
-    }
-}
+// Complex number type and CMPLX helpers live in ComplexMode.swift
 
 // MARK: - Fraction Representation
 
@@ -254,149 +139,9 @@ public struct Fraction: Equatable, Sendable {
     }
 }
 
-// MARK: - Matrix & Vector Types
+// Matrix type and MATRIX helpers live in MatrixMode.swift
 
-public struct Matrix: Equatable, Sendable {
-    public var rows: Int
-    public var cols: Int
-    public var elements: [[Double]]
-
-    public init(rows: Int, cols: Int, initial: Double = 0) {
-        self.rows = max(1, min(3, rows))
-        self.cols = max(1, min(3, cols))
-        self.elements = Array(repeating: Array(repeating: initial, count: self.cols), count: self.rows)
-    }
-
-    public init(elements: [[Double]]) {
-        self.rows = elements.count
-        self.cols = elements.first?.count ?? 0
-        self.elements = elements
-    }
-
-    public func determinant() -> Double? {
-        guard rows == cols else { return nil }
-        if rows == 1 { return elements[0][0] }
-        if rows == 2 {
-            return elements[0][0] * elements[1][1] - elements[0][1] * elements[1][0]
-        }
-        if rows == 3 {
-            let a = elements[0][0], b = elements[0][1], c = elements[0][2]
-            let d = elements[1][0], e = elements[1][1], f = elements[1][2]
-            let g = elements[2][0], h = elements[2][1], i = elements[2][2]
-            return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
-        }
-        return nil
-    }
-
-    public func transpose() -> Matrix {
-        var result = Matrix(rows: cols, cols: rows)
-        for r in 0..<rows {
-            for c in 0..<cols {
-                result.elements[c][r] = elements[r][c]
-            }
-        }
-        return result
-    }
-
-    public func inverse() -> Matrix? {
-        guard rows == cols, let det = determinant(), abs(det) > 1e-12 else { return nil }
-        if rows == 1 {
-            return Matrix(elements: [[1.0 / det]])
-        }
-        if rows == 2 {
-            return Matrix(elements: [
-                [elements[1][1] / det, -elements[0][1] / det],
-                [-elements[1][0] / det, elements[0][0] / det]
-            ])
-        }
-        if rows == 3 {
-            let a = elements[0][0], b = elements[0][1], c = elements[0][2]
-            let d = elements[1][0], e = elements[1][1], f = elements[1][2]
-            let g = elements[2][0], h = elements[2][1], i = elements[2][2]
-
-            let inv: [[Double]] = [
-                [(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det],
-                [(f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det],
-                [(d * h - e * g) / det, (g * b - a * h) / det, (a * e - b * d) / det]
-            ]
-            return Matrix(elements: inv)
-        }
-        return nil
-    }
-
-    public static func + (lhs: Matrix, rhs: Matrix) -> Matrix? {
-        guard lhs.rows == rhs.rows && lhs.cols == rhs.cols else { return nil }
-        var res = Matrix(rows: lhs.rows, cols: lhs.cols)
-        for r in 0..<lhs.rows {
-            for c in 0..<lhs.cols {
-                res.elements[r][c] = lhs.elements[r][c] + rhs.elements[r][c]
-            }
-        }
-        return res
-    }
-
-    public static func - (lhs: Matrix, rhs: Matrix) -> Matrix? {
-        guard lhs.rows == rhs.rows && lhs.cols == rhs.cols else { return nil }
-        var res = Matrix(rows: lhs.rows, cols: lhs.cols)
-        for r in 0..<lhs.rows {
-            for c in 0..<lhs.cols {
-                res.elements[r][c] = lhs.elements[r][c] - rhs.elements[r][c]
-            }
-        }
-        return res
-    }
-
-    public static func * (lhs: Matrix, rhs: Matrix) -> Matrix? {
-        guard lhs.cols == rhs.rows else { return nil }
-        var res = Matrix(rows: lhs.rows, cols: rhs.cols)
-        for r in 0..<lhs.rows {
-            for c in 0..<rhs.cols {
-                var sum = 0.0
-                for k in 0..<lhs.cols {
-                    sum += lhs.elements[r][k] * rhs.elements[k][c]
-                }
-                res.elements[r][c] = sum
-            }
-        }
-        return res
-    }
-}
-
-public struct Vector3D: Equatable, Sendable {
-    public var x: Double
-    public var y: Double
-    public var z: Double
-
-    public init(x: Double = 0, y: Double = 0, z: Double = 0) {
-        self.x = x
-        self.y = y
-        self.z = z
-    }
-
-    public var magnitude: Double {
-        Foundation.sqrt(x * x + y * y + z * z)
-    }
-
-    public static func + (lhs: Vector3D, rhs: Vector3D) -> Vector3D {
-        Vector3D(x: lhs.x + rhs.x, y: lhs.y + rhs.y, z: lhs.z + rhs.z)
-    }
-
-    public static func - (lhs: Vector3D, rhs: Vector3D) -> Vector3D {
-        Vector3D(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
-    }
-
-    public static func dot(_ lhs: Vector3D, _ rhs: Vector3D) -> Double {
-        lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z
-    }
-
-    public static func cross(_ lhs: Vector3D, _ rhs: Vector3D) -> Vector3D {
-        Vector3D(
-            x: lhs.y * rhs.z - lhs.z * rhs.y,
-            y: lhs.z * rhs.x - lhs.x * rhs.z,
-            z: lhs.x * rhs.y - lhs.y * rhs.x
-        )
-    }
-}
+// Vector3D (standalone vector math) and VectorValue live in VectorMode.swift
 
 // MARK: - Constants & Conversions Tables
 
@@ -741,9 +486,46 @@ public enum CasioEvaluator {
                 i += 1
                 continue
             }
-            if c == "°" {
-                tokens.append(.postfixOp("°"))
-                i += 1
+
+            // Sexagesimal (DMS) markers: fold {d}°{m}'{s}" into one value
+            // (fx-991ES input syntax; degrees + minutes/60 + seconds/3600)
+            if c == "°" || c == "'" || c == "\"" {
+                guard case .number(var dmsTotal)? = tokens.last else {
+                    // Marker with no preceding value (e.g. 45°'17") is malformed
+                    throw NSError(domain: "Parse", code: 6)
+                }
+                var j = i + 1
+                if c == "°" {
+                    // Degrees already folded (factor 1); look for minutes/seconds
+                    var mStr = ""
+                    while j < chars.count && ((chars[j] >= "0" && chars[j] <= "9") || chars[j] == ".") {
+                        mStr.append(chars[j]); j += 1
+                    }
+                    if !mStr.isEmpty, j < chars.count, chars[j] == "'" {
+                        guard let m = Double(mStr) else { throw NSError(domain: "Parse", code: 6) }
+                        dmsTotal += m / 60.0
+                        j += 1
+                        var sStr = ""
+                        let sStart = j
+                        while j < chars.count && ((chars[j] >= "0" && chars[j] <= "9") || chars[j] == ".") {
+                            sStr.append(chars[j]); j += 1
+                        }
+                        if !sStr.isEmpty, j < chars.count, chars[j] == "\"" {
+                            guard let s = Double(sStr) else { throw NSError(domain: "Parse", code: 6) }
+                            dmsTotal += s / 3600.0
+                            j += 1
+                        } else {
+                            j = sStart // no seconds field; leave trailing digits to parse normally
+                        }
+                    } else {
+                        j = i + 1 // no minutes field; bare d° is valid (identity)
+                    }
+                } else {
+                    // "'" or """ marker without a ° start of group
+                    throw NSError(domain: "Parse", code: 6)
+                }
+                tokens[tokens.count - 1] = .number(dmsTotal)
+                i = j
                 continue
             }
 
@@ -791,9 +573,21 @@ public enum CasioEvaluator {
                 continue
             }
 
-            // Variables (A, B, C, D, E, F, X, Y, M)
+            // Variables (A, B, C, D, E, F, X, Y, M) — except that C between a
+            // value and a digit is the nCr operator glyph (fx-991ES shows nCr as C)
             if ["A", "B", "C", "D", "E", "F", "X", "Y", "M"].contains(c) &&
                 (i + 1 == chars.count || !chars[i + 1].isLetter) {
+                let nextIsDigit = i + 1 < chars.count && ((chars[i + 1] >= "0" && chars[i + 1] <= "9") || chars[i + 1] == ".")
+                var prevIsValue = false
+                switch tokens.last {
+                case .number, .complex, .closeParen, .postfixOp: prevIsValue = true
+                default: prevIsValue = false
+                }
+                if c == "C" && prevIsValue && nextIsDigit {
+                    tokens.append(.binaryOp("nCr", 2, false))
+                    i += 1
+                    continue
+                }
                 if let last = tokens.last, canImplicitMultiplyBefore(last) {
                     tokens.append(.binaryOp("×", 3, false))
                 }
@@ -822,13 +616,18 @@ public enum CasioEvaluator {
                         tokens.append(.binaryOp("×", 3, false))
                     }
                     tokens.append(.prefixFunc(word))
+                } else if word == "P" {
+                    // Authentic display glyph: nPr renders as P on the fx-991ES
+                    tokens.append(.binaryOp("nPr", 2, false))
+                } else if word == "C" {
+                    tokens.append(.binaryOp("nCr", 2, false))
                 } else if ["nPr", "nCr", "and", "or", "xor", "xnor"].contains(word) {
                     tokens.append(.binaryOp(word, 2, false))
                 } else if word == "Not" {
                     tokens.append(.prefixFunc("Not"))
                 } else if word == "Neg" {
                     tokens.append(.prefixFunc("Neg"))
-                } else if word == "RanInt" {
+                } else if word == "RanInt" || word == "RanInt#" {
                     tokens.append(.prefixFunc("RanInt"))
                 } else {
                     tokens.append(.identifier(word))
@@ -946,13 +745,34 @@ public enum CasioEvaluator {
                     stack.append(fact)
                 case "%":
                     stack.append(val / 100.0)
-                case "°":
-                    stack.append(angleUnit.toRadians(val))
                 default:
                     return EvalResult(error: "Syntax ERROR")
                 }
 
             case .prefixFunc(let f):
+                // Two-argument functions: Pol(x,y), Rec(r,θ), RanInt#(lo,hi).
+                // Shunting-yard leaves the two operands on the stack in order.
+                if f == "Pol" || f == "Rec" || f == "RanInt" {
+                    guard let right = stack.popLast(), let left = stack.popLast() else {
+                        return EvalResult(error: "Syntax ERROR")
+                    }
+                    switch f {
+                    case "Pol":
+                        // Rectangular (x,y) → polar radius r. (θ = atan2(y,x)
+                        // in the current angle unit is the secondary result.)
+                        stack.append(Foundation.sqrt(left * left + right * right))
+                    case "Rec":
+                        // Polar (r,θ) → rectangular x component.
+                        stack.append(left * Foundation.cos(angleUnit.toRadians(right)))
+                    case "RanInt":
+                        let lo = Int(left.rounded()), hi = Int(right.rounded())
+                        guard lo <= hi else { return EvalResult(error: "Math ERROR") }
+                        stack.append(Double(Int.random(in: lo...hi)))
+                    default:
+                        break
+                    }
+                    continue
+                }
                 guard let val = stack.popLast() else { return EvalResult(error: "Syntax ERROR") }
                 switch f {
                 case "neg":
@@ -1289,6 +1109,18 @@ public enum CasioEvaluator {
         }
     }
 
+    /// Engineering notation with an ENG/← shift level: level 0 is the plain
+    /// form; each ENG press moves the decimal point three places (manual p.24).
+    public static func formatEng(_ val: Double, level: Int) -> String {
+        guard val.isFinite, val != 0, level > 0 else { return format(val, format: .norm) }
+        let exp = Int(floor(Foundation.log10(abs(val))))
+        // Base exponent: floor to a multiple of 3
+        let baseExp = exp >= 0 ? (exp / 3) * 3 : ((exp - 2) / 3) * 3
+        let targetExp = baseExp + 3 * (level - 1)
+        let mantissa = val / Foundation.pow(10.0, Double(targetExp))
+        return "\(String(format: "%.10g", mantissa))×10^\(targetExp)"
+    }
+
     public static func primeFactorization(_ val: Int64) -> String? {
         guard val > 1 && val <= 10000000000 else { return nil }
         var n = val
@@ -1328,14 +1160,42 @@ public enum CasioEvaluator {
         return res
     }
 
-    public static func toDMS(_ val: Double) -> String {
-        let absVal = abs(val)
-        let deg = Int(floor(absVal))
-        let remMin = (absVal - Double(deg)) * 60.0
-        let min = Int(floor(remMin))
-        let sec = (remMin - Double(min)) * 60.0
+    /// Formats a decimal value as sexagesimal degrees with authentic Casio
+    /// glyphs and normalized fields (0–59 minutes/seconds), e.g. 2.255 → 2°15'18".
+    public static func formatSexagesimal(_ val: Double) -> String {
+        guard val.isFinite else { return "Math ERROR" }
         let sign = val < 0 ? "−" : ""
-        return "\(sign)\(deg)°\(min)′\(String(format: "%.2g", sec))″"
+        let absVal = abs(val)
+        var deg = Int(floor(absVal))
+        var remMin = (absVal - Double(deg)) * 60.0
+        var min = Int(floor(remMin))
+        var sec = (remMin - Double(min)) * 60.0
+
+        // Carry rounding overflow (59.999…″) into the higher fields
+        let secRounded = (sec * 100.0).rounded() / 100.0
+        if secRounded >= 60.0 {
+            sec = 0
+            remMin = 0
+            min += 1
+            if min >= 60 {
+                min = 0
+                deg += 1
+            }
+        } else {
+            sec = secRounded
+        }
+
+        let secText: String
+        if abs(sec - sec.rounded()) < 1e-9 {
+            secText = "\(Int(sec.rounded()))"
+        } else {
+            secText = "\(sec)"
+        }
+        return "\(sign)\(deg)°\(min)'\(secText)\""
+    }
+
+    public static func toDMS(_ val: Double) -> String {
+        formatSexagesimal(val)
     }
 
     // MARK: - Equation Solvers & Numerical Methods
@@ -1377,120 +1237,6 @@ public enum CasioEvaluator {
         return (root: x0, residual: finalRes)
     }
 
-    public static func solveQuadratic(a: Double, b: Double, c: Double) -> [String] {
-        guard a != 0 else {
-            if b != 0 {
-                return ["X=\(format(-c / b, format: .norm))"]
-            }
-            return ["No Solution"]
-        }
-        let disc = b * b - 4 * a * c
-        if disc >= 0 {
-            let sqrtD = Foundation.sqrt(disc)
-            let x1 = (-b + sqrtD) / (2 * a)
-            let x2 = (-b - sqrtD) / (2 * a)
-            if abs(disc) < 1e-12 {
-                return ["X=\(format(x1, format: .norm))"]
-            }
-            return [
-                "X1=\(format(x1, format: .norm))",
-                "X2=\(format(x2, format: .norm))"
-            ]
-        } else {
-            let realPart = -b / (2 * a)
-            let imagPart = Foundation.sqrt(-disc) / (2 * a)
-            let c1 = Complex(real: realPart, imag: imagPart)
-            let c2 = Complex(real: realPart, imag: -imagPart)
-            return [
-                "X1=\(c1.formatRectangular())",
-                "X2=\(c2.formatRectangular())"
-            ]
-        }
-    }
-
-    public static func solveSimultaneous2(a1: Double, b1: Double, c1: Double, a2: Double, b2: Double, c2: Double) -> [String] {
-        let d = a1 * b2 - a2 * b1
-        guard abs(d) > 1e-12 else {
-            return ["Infinite/No Sol"]
-        }
-        let x = (c1 * b2 - c2 * b1) / d
-        let y = (a1 * c2 - a2 * c1) / d
-        return [
-            "X=\(format(x, format: .norm))",
-            "Y=\(format(y, format: .norm))"
-        ]
-    }
-
-    public static func solveSimultaneous3(
-        a1: Double, b1: Double, c1: Double, d1: Double,
-        a2: Double, b2: Double, c2: Double, d2: Double,
-        a3: Double, b3: Double, c3: Double, d3: Double
-    ) -> [String] {
-        let matA = Matrix(elements: [
-            [a1, b1, c1],
-            [a2, b2, c2],
-            [a3, b3, c3]
-        ])
-        guard let det = matA.determinant(), abs(det) > 1e-12 else {
-            return ["Infinite/No Sol"]
-        }
-        let matDx = Matrix(elements: [
-            [d1, b1, c1],
-            [d2, b2, c2],
-            [d3, b3, c3]
-        ])
-        let matDy = Matrix(elements: [
-            [a1, d1, c1],
-            [a2, d2, c2],
-            [a3, d3, c3]
-        ])
-        let matDz = Matrix(elements: [
-            [a1, b1, d1],
-            [a2, b2, d2],
-            [a3, b3, d3]
-        ])
-        let x = (matDx.determinant() ?? 0) / det
-        let y = (matDy.determinant() ?? 0) / det
-        let z = (matDz.determinant() ?? 0) / det
-        return [
-            "X=\(format(x, format: .norm))",
-            "Y=\(format(y, format: .norm))",
-            "Z=\(format(z, format: .norm))"
-        ]
-    }
-
-    public static func solveCubic(a: Double, b: Double, c: Double, d: Double) -> [String] {
-        guard a != 0 else {
-            return solveQuadratic(a: b, b: c, c: d)
-        }
-        var x0 = 0.0
-        for trial in [-10.0, -1.0, 0.0, 1.0, 10.0] {
-            var x = trial
-            for _ in 0..<50 {
-                let fx = a * x * x * x + b * x * x + c * x + d
-                let dfx = 3 * a * x * x + 2 * b * x + c
-                if abs(dfx) < 1e-12 { break }
-                let xNext = x - fx / dfx
-                if abs(xNext - x) < 1e-9 {
-                    x0 = xNext
-                    break
-                }
-                x = xNext
-            }
-            if abs(a * x0 * x0 * x0 + b * x0 * x0 + c * x0 + d) < 1e-5 {
-                break
-            }
-        }
-        let a2 = a
-        let b2 = b + a2 * x0
-        let c2 = c + b2 * x0
-        let quadRoots = solveQuadratic(a: a2, b: b2, c: c2)
-        return ["X1=\(format(x0, format: .norm))"] + quadRoots.enumerated().map { (idx, rootStr) in
-            let num = idx + 2
-            let val = rootStr.components(separatedBy: "=").last ?? rootStr
-            return "X\(num)=\(val)"
-        }
-    }
 }
 
 private extension Array {
@@ -1504,15 +1250,26 @@ private extension Array {
 public final class CalculatorEngine: ObservableObjectProtocol {
     @Published public var expression: String = ""
     @Published public var cursorPosition: Int = 0
-    @Published public var result: String = "0"
+    @Published public var result: String = ""
     @Published public var angleUnit: AngleUnit = .deg
     @Published public var displayFormat: DisplayFormat = .norm
     @Published public var activeMode: CalcMode = .comp
     @Published public var menuState: MenuState = .none
 
     @Published public var baseNType: BaseNType = .dec
+    @Published public var complexFormat: ComplexFormat = .rectangular
+    @Published public var statFrequencyEnabled: Bool = false
+    // SETUP preferences (manual §3, opened with SHIFT+MODE)
+    @Published public var mathOutputStyle: MathOutputStyle = .mathO
+    @Published public var normMode: NormMode = .norm1
+    @Published public var decimalPoint: DecimalPoint = .dot
+    @Published public var fractionDisplay: FractionDisplay = .improper
+    @Published public var contrastLevel: Int = 3
     @Published public var shiftActive: Bool = false
     @Published public var alphaActive: Bool = false
+    /// SHIFT + DEL (INS) toggles insert/overwrite mode in Linear Display.
+    /// Natural Display always uses insert mode.
+    @Published public var isOverwriteMode: Bool = false
     @Published public var hasMemory: Bool = false
     @Published public var isError: Bool = false
     @Published public var isOff: Bool = false
@@ -1522,6 +1279,25 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     @Published public var exactResult: ExactValue? = nil
     @Published public var isShowingDecimal: Bool = false
     @Published public var isMthIO: Bool = true
+
+    /// True while a completed calculation (result or error) is on the display.
+    /// Drives the authentic fx-991ES continuation behavior: a digit starts a
+    /// fresh calculation, while + − × ÷ auto-insert the Ans command (manual E-25).
+    @Published public var isShowingResult: Bool = false
+    /// True while an intermediate result of a multi-statement (`:`) calculation
+    /// is shown — lights the `Disp` annunciator on the LCD.
+    @Published public var isShowingIntermediate: Bool = false
+    /// Remaining statements of a multi-statement calculation, shown one per `=`.
+    private var pendingStatements: [String] = []
+    /// True while the result line shows a sexagesimal (degree-minute-second) value.
+    @Published public var isShowingDMS: Bool = false
+    // Key-capture states (STO / RCL / hyp wait for the next key, like the real key flow)
+    @Published public var waitingForSto: Bool = false
+    @Published public var waitingForRcl: Bool = false
+    @Published public var waitingForHyp: Bool = false
+    // ENG decimal-shift level and DRG▶ cycle step applied to the displayed result
+    public var engLevel: Int = 0
+    public var drgCycle: Int = 0
 
     // History
     public var history: [String] = []
@@ -1537,17 +1313,27 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     }
     public var lastAnswer: Double = 0
     public var lastComplexAnswer: Complex = .zero
+    /// True while the display shows the last complex result (so ▶r∠θ / ▶a+bi
+    /// commands and the SETUP complex format can reformat it without recomputing).
+    @Published public var isShowingComplexResult: Bool = false
 
     // Specialized Mode Data
     public var matA = Matrix(rows: 3, cols: 3)
     public var matB = Matrix(rows: 3, cols: 3)
     public var matC = Matrix(rows: 3, cols: 3)
     public var matAns = Matrix(rows: 3, cols: 3)
+    /// Matrices whose dimensions the user has confirmed (fx-991ES: an undefined
+    /// matrix cannot be used in a calculation until Dim is set)
+    public var definedMatrices: Set<String> = []
+    /// Last matrix result, rendered as a grid on the LCD and stored in MatAns
+    public var matrixResult: Matrix?
 
-    public var vctA = Vector3D()
-    public var vctB = Vector3D()
-    public var vctC = Vector3D()
-    public var vctAns = Vector3D()
+    public var vctA = VectorValue([0, 0, 0])
+    public var vctB = VectorValue([0, 0, 0])
+    public var vctC = VectorValue([0, 0, 0])
+    public var vctAns = VectorValue([0, 0, 0])
+    public var definedVectors: Set<String> = []
+    public var vectorResult: VectorValue?
 
     public var statData: [(x: Double, y: Double, freq: Double)] = []
     public var statType: String = "1-VAR"
@@ -1582,24 +1368,81 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         cursorPosition = 0
         astManager = MathASTManager()
         exactResult = nil
+        matrixResult = nil
+        vectorResult = nil
+        isShowingComplexResult = false
         isShowingDecimal = false
-        result = "0"
+        result = ""
         isError = false
         menuState = .none
         shiftActive = false
         alphaActive = false
+        isShowingResult = false
+        isShowingIntermediate = false
+        pendingStatements = []
+        isShowingDMS = false
+        waitingForSto = false
+        waitingForRcl = false
+        waitingForHyp = false
+        engLevel = 0
+        drgCycle = 0
     }
+
+    // MARK: - Result-State Transition (authentic fx-991ES continuation)
+
+    /// Called before any input while a completed calculation is on the display.
+    /// Digits/functions start a fresh calculation; + − × ÷ continue with the
+    /// Ans command (fx-991ES manual E-25: "Pressing ÷ automatically inputs the
+    /// 'Ans' command"). The stale result line is cleared like on the real LCD.
+    private func beginInputIfShowingResult(autoAns: Bool = false) {
+        guard isShowingResult else { return }
+        isShowingResult = false
+        isShowingIntermediate = false
+        pendingStatements = []
+        isShowingDMS = false
+        astManager = MathASTManager()
+        expression = ""
+        cursorPosition = 0
+        result = ""
+        exactResult = nil
+        matrixResult = nil
+        vectorResult = nil
+        isShowingComplexResult = false
+        isShowingDecimal = false
+        engLevel = 0
+        drgCycle = 0
+        if autoAns {
+            astManager.insertText("Ans")
+            expression = "Ans"
+            cursorPosition = 3
+        }
+    }
+
+    /// The four binary operator glyphs that continue from Ans after `=`.
+    private static let ansContinuationOps: Set<String> = ["+", "−", "×", "÷"]
 
     public func resetAll() {
         clearAll()
-        angleUnit = .deg
-        displayFormat = .norm
+        applySetupDefaults()
         activeMode = .comp
         baseNType = .dec
-        isMthIO = true
         variables = ["A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0, "X": 0, "Y": 0, "M": 0]
         lastAnswer = 0
         lastComplexAnswer = .zero
+        matA = Matrix(rows: 3, cols: 3)
+        matB = Matrix(rows: 3, cols: 3)
+        matC = Matrix(rows: 3, cols: 3)
+        matAns = Matrix(rows: 3, cols: 3)
+        definedMatrices = []
+        matrixResult = nil
+        vectorResult = nil
+        isShowingComplexResult = false
+        vctA = VectorValue([0, 0, 0])
+        vctB = VectorValue([0, 0, 0])
+        vctC = VectorValue([0, 0, 0])
+        vctAns = VectorValue([0, 0, 0])
+        definedVectors = []
+        vectorResult = nil
         statData.removeAll()
         tableRows.removeAll()
         history.removeAll()
@@ -1609,9 +1452,12 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     // MARK: - 2D AST Editing & Cursor Operations
 
     public func insertASTText(_ text: String) {
+        guard baseNAllows(text) else { return }
         if isError {
             clearAll()
         }
+        // fx-991ES: a bare + − × ÷ right after `=` continues from the answer
+        beginInputIfShowingResult(autoAns: CalculatorEngine.ansContinuationOps.contains(text))
         astManager.insertText(text)
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1621,7 +1467,35 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertFraction()
+        expression = astManager.toLinearString()
+        cursorPosition = expression.count
+    }
+
+    /// Mixed fraction template (SHIFT + a b/c on the fx-991ES).
+    public func insertASTMixedFraction() {
+        if isError {
+            clearAll()
+        }
+        beginInputIfShowingResult()
+        astManager.insertMixedFraction()
+        expression = astManager.toLinearString()
+        cursorPosition = expression.count
+    }
+
+    /// ° ' " key. During input: inserts one sexagesimal marker (d°m's" syntax —
+    /// nothing is converted yet). On a displayed result: toggles the display
+    /// between decimal and sexagesimal form (manual p.23) without changing Ans.
+    public func insertDMSMark() {
+        if isShowingResult {
+            toggleResultDMS()
+            return
+        }
+        if isError {
+            clearAll()
+        }
+        astManager.insertDMSMark()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
     }
@@ -1630,6 +1504,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertRadical()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1639,6 +1514,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertNthRoot()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1648,6 +1524,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertCubeRoot()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1657,7 +1534,18 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertExponent()
+        expression = astManager.toLinearString()
+        cursorPosition = expression.count
+    }
+
+    public func insertASTDerivative() {
+        if isError {
+            clearAll()
+        }
+        beginInputIfShowingResult()
+        astManager.insertDerivative()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
     }
@@ -1666,6 +1554,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertIntegral()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1675,6 +1564,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertSummation()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1684,6 +1574,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertLogBase()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1693,6 +1584,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertParens()
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1702,6 +1594,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         if isError {
             clearAll()
         }
+        beginInputIfShowingResult()
         astManager.insertFunction(name)
         expression = astManager.toLinearString()
         cursorPosition = expression.count
@@ -1710,11 +1603,37 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     // MARK: - Backward-Compatible Linear Editing
 
     public func insert(_ text: String) {
+        // Ignore further typing once the expression buffer is full, so a key
+        // that fires repeatedly (e.g. held down) can never freeze the app.
+        guard !astManager.isAtCapacity else { return }
+        guard baseNAllows(text) else { return }
         if isError {
             isError = false
             expression = ""
             cursorPosition = 0
             astManager = MathASTManager()
+            isShowingResult = false
+        }
+        // Same continuation rules as the 2D path: ops continue from Ans
+        let firstOp = text.first.map { String($0) } ?? ""
+        beginInputIfShowingResult(autoAns: CalculatorEngine.ansContinuationOps.contains(firstOp) && text.count == 1)
+
+        // SHIFT+DEL (INS) overwrite mode: replace characters at the cursor
+        // instead of inserting them (Linear Display only).
+        if isOverwriteMode && !isMthIO {
+            let chars = Array(expression)
+            let pos = min(max(0, cursorPosition), chars.count)
+            var newChars = chars
+            for (offset, ch) in text.enumerated() {
+                let idx = pos + offset
+                if idx < newChars.count { newChars[idx] = ch } else { newChars.append(ch) }
+            }
+            expression = String(newChars)
+            cursorPosition = min(pos + text.count, newChars.count)
+            var fresh = MathASTManager()
+            for ch in newChars { fresh.insertText(String(ch)) }
+            astManager = fresh
+            return
         }
 
         for char in text {
@@ -1736,6 +1655,10 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             return
         }
 
+        // DEL after `=` edits the previous expression (Replay, manual p.24)
+        isShowingResult = false
+        isShowingDMS = false
+
         if isMthIO && !astManager.root.isEmpty {
             astManager.delete()
             expression = astManager.toLinearString()
@@ -1754,6 +1677,9 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     }
 
     public func moveCursorLeft() {
+        // ◄ after `=` replays/edits the previous expression (manual p.24)
+        isShowingResult = false
+        isShowingDMS = false
         astManager.moveLeft()
         if cursorPosition > 0 {
             cursorPosition -= 1
@@ -1761,10 +1687,27 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     }
 
     public func moveCursorRight() {
+        isShowingResult = false
+        isShowingDMS = false
         astManager.moveRight()
         if cursorPosition < expression.count {
             cursorPosition += 1
         }
+    }
+
+    /// Move the linear (LineIO) insertion cursor to a tapped character index.
+    public func setLinearCursorPosition(_ index: Int) {
+        isShowingResult = false
+        isShowingDMS = false
+        cursorPosition = min(max(0, index), expression.count)
+    }
+
+    /// Move the 2D insertion cursor to a tapped position in the expression.
+    public func moveCursor(to path: CursorPath) {
+        isShowingResult = false
+        isShowingDMS = false
+        astManager.cursor = path
+        cursorPosition = astManager.toLinearString().count
     }
 
     @discardableResult
@@ -1785,6 +1728,8 @@ public final class CalculatorEngine: ObservableObjectProtocol {
 
     public func moveHistoryUp() {
         guard !history.isEmpty else { return }
+        isShowingResult = false
+        isShowingDMS = false
         if historyIndex == -1 {
             historyIndex = history.count - 1
         } else if historyIndex > 0 {
@@ -1798,6 +1743,8 @@ public final class CalculatorEngine: ObservableObjectProtocol {
 
     public func moveHistoryDown() {
         guard !history.isEmpty && historyIndex >= 0 else { return }
+        isShowingResult = false
+        isShowingDMS = false
         if historyIndex < history.count - 1 {
             historyIndex += 1
             expression = history[historyIndex]
@@ -1815,7 +1762,33 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     // MARK: - Evaluation
 
     public func evaluate() {
-        let linear = astManager.root.isEmpty ? expression : astManager.toLinearString()
+        let fullExpression = astManager.root.isEmpty ? expression : astManager.toLinearString()
+        guard !fullExpression.isEmpty else { return }
+
+        // Multi-statement (`:`) calculations: each `=` reveals the next
+        // intermediate result while the `Disp` annunciator is lit (ref §8.3).
+        if !pendingStatements.isEmpty {
+            let next = pendingStatements.removeFirst()
+            evaluateSingle(next)
+            isShowingIntermediate = !pendingStatements.isEmpty
+            return
+        }
+        if fullExpression.contains(":") {
+            let statements = fullExpression.components(separatedBy: ":").filter { !$0.isEmpty }
+            if statements.count > 1 {
+                pendingStatements = Array(statements.dropFirst())
+                evaluateSingle(statements[0])
+                isShowingIntermediate = true
+                return
+            }
+        }
+
+        isShowingIntermediate = false
+        evaluateSingle(fullExpression)
+    }
+
+    /// Evaluate a single (already separated) expression and render its result.
+    private func evaluateSingle(_ linear: String) {
         guard !linear.isEmpty else { return }
 
         // Append to history
@@ -1824,6 +1797,20 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         }
         historyIndex = -1
 
+        // A completed calculation (result or error) is now on the display
+        isShowingResult = true
+        isShowingDMS = false
+        engLevel = 0
+        drgCycle = 0
+
+        // Expressions containing ° ' " markers display their result sexagesimally
+        // (manual p.22: arithmetic involving sexagesimal values → sexagesimal result)
+        let expressionHadDMS = linear.contains("°")
+        // Decimal-keyed input stays decimal (manual p.21: mixing fractions and
+        // decimal values → decimal result; only pure rational arithmetic
+        // auto-fractionizes, e.g. 2.255 = shows 2.255, 1÷3 = shows 1⌸3)
+        let expressionHadDecimal = linear.contains(".")
+
         if activeMode == .baseN {
             evaluateBaseN()
             shiftActive = false
@@ -1831,13 +1818,97 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             return
         }
 
+        // 0b. Vector-mode expressions (VctA, VctB, VctC, VctAns, Dot, Abs, ×)
+        // are handled by the dedicated vector evaluator (manual §10).
+        if linear.contains("Vct") {
+            var vectors: [String: VectorValue] = [:]
+            for name in ["VctA", "VctB", "VctC", "VctAns"] where definedVectors.contains(name) {
+                vectors[name] = vectorValue(for: name)
+            }
+            let vEval = VectorEvaluator.evaluate(linear, vectors: vectors)
+            isError = false
+            if let err = vEval.error {
+                isError = true
+                exactResult = nil
+                vectorResult = nil
+                result = err
+            } else if case .vector(let v)? = vEval.value {
+                exactResult = nil
+                vctAns = v
+                definedVectors.insert("VctAns")
+                vectorResult = v
+                result = v.linearString
+            } else if case .scalar(let s)? = vEval.value {
+                exactResult = nil
+                lastAnswer = s
+                isShowingDecimal = true
+                result = formatNumber(s)
+            }
+            shiftActive = false
+            alphaActive = false
+            return
+        }
+
+        // 0. Matrix-mode expressions (MatA, MatB, MatC, MatAns, det(, Trn()
+        // cannot be evaluated by the numeric/exact engines. Undefined matrices
+        // are left out of the lookup so using them reports Dim ERROR (manual p.47).
+        if linear.contains("Mat") {
+            var matrices: [String: Matrix] = [:]
+            for name in ["MatA", "MatB", "MatC", "MatAns"] where definedMatrices.contains(name) {
+                matrices[name] = matrixValue(for: name)
+            }
+            let mEval = MatrixEvaluator.evaluate(linear, matrices: matrices)
+            isError = false
+            if let err = mEval.error {
+                isError = true
+                exactResult = nil
+                matrixResult = nil
+                vectorResult = nil
+                isShowingComplexResult = false
+                result = err
+            } else if case .matrix(let m)? = mEval.value {
+                // Matrix results are stored in MatAns and shown as a grid
+                exactResult = nil
+                matAns = m
+                definedMatrices.insert("MatAns")
+                matrixResult = m
+                result = m.toLinearString()
+            } else if case .scalar(let s)? = mEval.value {
+                // Scalar results (e.g. det(MatA)) behave like normal numbers
+                exactResult = nil
+                matrixResult = nil
+                vectorResult = nil
+                isShowingComplexResult = false
+                lastAnswer = s
+                isShowingDecimal = true
+                result = formatNumber(s)
+            }
+            shiftActive = false
+            alphaActive = false
+            return
+        }
+
+        // Any non-matrix calculation supersedes a previous matrix result
+        matrixResult = nil
+        vectorResult = nil
+        isShowingComplexResult = false
+
         // 1. Try Exact Symbolic Evaluation (Natural-V.P.A.M.)
-        if !astManager.root.isEmpty, let exactVal = ExactEvaluator.evaluate(nodes: astManager.root, angleUnit: angleUnit) {
+        if !astManager.root.isEmpty,
+           let exactVal = ExactEvaluator.evaluate(nodes: astManager.root, angleUnit: angleUnit, ans: lastAnswer, variables: variables) {
             exactResult = exactVal
             lastAnswer = exactVal.toDouble()
             isShowingDecimal = !isMthIO
-            result = isShowingDecimal ? CasioEvaluator.format(exactVal.toDouble(), format: displayFormat) : exactVal.toLinearString()
             isError = false
+            if expressionHadDMS {
+                isShowingDMS = true
+                result = CasioEvaluator.formatSexagesimal(lastAnswer)
+            } else if expressionHadDecimal {
+                isShowingDecimal = true
+                result = formatNumber(exactVal.toDouble())
+            } else {
+                result = isShowingDecimal ? formatNumber(exactVal.toDouble()) : exactVal.toLinearString()
+            }
             shiftActive = false
             alphaActive = false
             return
@@ -1861,13 +1932,18 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             exactResult = nil
             lastComplexAnswer = cVal
             lastAnswer = cVal.real
-            result = cVal.formatRectangular()
+            isShowingComplexResult = true
+            result = formatComplex(cVal)
         } else if let val = eval.value {
             isError = false
             lastAnswer = val
             // Check if can be represented as an exact fraction in MthIO mode (skip if transcendental pi or e present)
             let hasTranscendental = linear.contains("π") || linear.contains("e")
-            if !hasTranscendental, let frac = Fraction.fromDouble(val), frac.den > 1 && frac.den <= 10000 && isMthIO {
+            if expressionHadDMS {
+                exactResult = nil
+                isShowingDMS = true
+                result = CasioEvaluator.formatSexagesimal(val)
+            } else if !hasTranscendental, !expressionHadDecimal, let frac = Fraction.fromDouble(val), frac.den > 1 && frac.den <= 10000 && isMthIO {
                 let exactFrac = ExactValue.rational(Rational(frac.num, frac.den))
                 exactResult = exactFrac
                 isShowingDecimal = false
@@ -1875,7 +1951,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             } else {
                 exactResult = nil
                 isShowingDecimal = true
-                result = CasioEvaluator.format(val, format: displayFormat)
+                result = formatNumber(val)
             }
         }
 
@@ -1883,45 +1959,7 @@ public final class CalculatorEngine: ObservableObjectProtocol {
         alphaActive = false
     }
 
-    private func evaluateBaseN() {
-        // Base-N evaluation: convert input according to baseNType
-        let eval = CasioEvaluator.evaluate(expression, angleUnit: .deg, variables: [:], lastAnswer: lastAnswer)
-        if let err = eval.error {
-            isError = true
-            result = err
-            return
-        }
-        guard let val = eval.value else {
-            isError = true
-            result = "Syntax ERROR"
-            return
-        }
-        let intVal = Int32(truncatingIfNeeded: Int64(val))
-        lastAnswer = Double(intVal)
-        isError = false
-        result = formatBaseN(intVal, base: baseNType)
-    }
-
-    public func formatBaseN(_ val: Int32, base: BaseNType) -> String {
-        switch base {
-        case .dec:
-            return "\(val)"
-        case .hex:
-            return String(UInt32(bitPattern: val), radix: 16, uppercase: true)
-        case .bin:
-            return String(UInt32(bitPattern: val), radix: 2)
-        case .oct:
-            return String(UInt32(bitPattern: val), radix: 8)
-        }
-    }
-
-    public func setBaseN(_ base: BaseNType) {
-        baseNType = base
-        if !isError, let val = Double(result) {
-            let intVal = Int32(truncatingIfNeeded: Int64(val))
-            result = formatBaseN(intVal, base: base)
-        }
-    }
+    // BASE-N implementation lives in BaseNMode.swift
 
     // MARK: - Modifiers
 
@@ -1933,6 +1971,13 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     public func toggleAlpha() {
         alphaActive.toggle()
         if alphaActive { shiftActive = false }
+    }
+
+    /// SHIFT + DEL (INS): toggle insert/overwrite editing in Linear Display.
+    /// Natural Display is always insert mode, so the flag is ignored there.
+    public func toggleInsertOverwrite() {
+        guard !isMthIO else { return }
+        isOverwriteMode.toggle()
     }
 
     // MARK: - Menus & Modes
@@ -1954,72 +1999,27 @@ public final class CalculatorEngine: ObservableObjectProtocol {
                 return
             case 1: activeMode = .comp
             case 2: activeMode = .cmplx
-            case 3: activeMode = .stat; openStatTypeMenu()
-            case 4: activeMode = .baseN
+            case 3: activeMode = .stat; isMthIO = false; openStatTypeMenu()
+            case 4: activeMode = .baseN; isMthIO = false
             case 5: activeMode = .eqn; openEqnTypeMenu()
-            case 6: activeMode = .matrix; openMatrixMenu()
+            case 6: activeMode = .matrix; isMthIO = false; openMatrixMenu()
             case 7: activeMode = .table; startTable()
-            case 8: activeMode = .vector; openVectorMenu()
+            case 8: activeMode = .vector; isMthIO = false; openVectorMenu()
             default: break
             }
             if menuState == .modeMenu { menuState = .none }
 
-        case .setupMenu(let page):
-            if page == 1 {
-                switch number {
-                case 1:
-                    isMthIO = true
-                    menuState = .mthIOMenu
-                case 2:
-                    isMthIO = false
-                    menuState = .none // LineIO
-                case 3: angleUnit = .deg; menuState = .none
-                case 4: angleUnit = .rad; menuState = .none
-                case 5: angleUnit = .gra; menuState = .none
-                case 6: menuState = .fixPrompt
-                case 7: menuState = .sciPrompt
-                case 8: displayFormat = .norm; menuState = .none
-                default: break
-                }
-            } else if page == 2 {
-                switch number {
-                case 1: displayFormat = .mixedFraction; menuState = .none
-                case 2: displayFormat = .fraction; menuState = .none
-                case 3: menuState = .none
-                case 4: menuState = .none
-                case 5: menuState = .none
-                default: break
-                }
-            }
-
-        case .mthIOMenu:
-            isMthIO = true
-            menuState = .none
+        case .setupMenu, .mthIOMenu, .fixPrompt, .sciPrompt, .normPrompt,
+             .dispFormatMenu, .statFreqMenu, .contrastPrompt, .cmplxFormatMenu:
+            handleSetupSelection(number)
 
         case .eqnTypeMenu:
             startEqn(type: number)
 
-        case .fixPrompt:
-            let d = min(max(0, number), 9)
-            displayFormat = .fix(d)
-            menuState = .none
-            if !isError, let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-                result = CasioEvaluator.format(val, format: displayFormat)
-            }
-
-        case .sciPrompt:
-            let d = min(max(0, number), 9)
-            displayFormat = .sci(d)
-            menuState = .none
-            if !isError, let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-                result = CasioEvaluator.format(val, format: displayFormat)
-            }
-
         case .clrPrompt:
             switch number {
-            case 1: // Reset Setup
-                angleUnit = .deg
-                displayFormat = .norm
+            case 1: // Reset Setup — restore all SETUP preferences (guide §3.7)
+                applySetupDefaults()
             case 2: // Reset Memory
                 variables = ["A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0, "X": 0, "Y": 0, "M": 0]
                 lastAnswer = 0
@@ -2041,8 +2041,62 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             case 8: statType = "1/X"
             default: break
             }
-            menuState = .none
+            statData.removeAll()
+            openStatEditor()   // the statistics editor opens after choosing a type (manual §6.2)
 
+        case .statSubMenu:
+            handleStatMenuOption(number)
+
+        case .cmplxMenu:
+            handleComplexMenuOption(number)
+
+        case .matrixMenu:
+            switch number {
+            case 1: menuState = .matrixDimSelect
+            case 2: menuState = .matrixDataSelect
+            case 3: insertMatrixToken("MatA"); menuState = .none
+            case 4: insertMatrixToken("MatB"); menuState = .none
+            case 5: insertMatrixToken("MatC"); menuState = .none
+            case 6: insertMatrixToken("MatAns"); menuState = .none
+            case 7: insertMatrixToken("det("); menuState = .none
+            case 8: insertMatrixToken("Trn("); menuState = .none
+            default: break
+            }
+
+        case .matrixDimSelect:
+            switch number {
+            case 1: openMatrixNamed("MatA")
+            case 2: openMatrixNamed("MatB")
+            case 3: openMatrixNamed("MatC")
+            default: menuState = .none
+            }
+
+        case .matrixDataSelect:
+            switch number {
+            case 1: openMatrixNamed("MatA", dataMode: true)
+            case 2: openMatrixNamed("MatB", dataMode: true)
+            case 3: openMatrixNamed("MatC", dataMode: true)
+            default: menuState = .none
+            }
+
+        case .vectorMenu:
+            handleVectorMenuOption(number)
+
+        case .vectorDimSelect:
+            switch number {
+            case 1: openVectorNamed("VctA")
+            case 2: openVectorNamed("VctB")
+            case 3: openVectorNamed("VctC")
+            default: menuState = .none
+            }
+
+        case .vectorDataSelect:
+            switch number {
+            case 1: openVectorNamed("VctA", dataMode: true)
+            case 2: openVectorNamed("VctB", dataMode: true)
+            case 3: openVectorNamed("VctC", dataMode: true)
+            default: menuState = .none
+            }
 
         default:
             menuState = .none
@@ -2052,36 +2106,56 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     // MARK: - Memory Operations
 
     public func storeToVariable(_ varName: Character) {
-        if let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-            variables[varName] = val
-            result = "\(varName)=\(CasioEvaluator.format(val, format: displayFormat))"
-        }
+        // Store the actual calculated value (the display may hold a fraction or
+        // sexagesimal form that doesn't parse back as a number)
+        let val = lastAnswer
+        variables[varName] = val
+        result = "\(varName)=\(formatNumber(val))"
     }
 
     public func recallVariable(_ varName: Character) {
         let val = variables[varName] ?? 0
-        insert(CasioEvaluator.format(val, format: displayFormat))
+        insert(CasioEvaluator.format(val, format: .norm))
     }
 
     public func addMemory() {
-        if let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-            variables["M"] = (variables["M"] ?? 0) + val
-        }
+        variables["M"] = (variables["M"] ?? 0) + lastAnswer
     }
 
     public func subtractMemory() {
-        if let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-            variables["M"] = (variables["M"] ?? 0) - val
+        variables["M"] = (variables["M"] ?? 0) - lastAnswer
+    }
+
+    /// STO / RCL / variable key flow: with a capture state active the next
+    /// variable key stores or recalls instead of typing its letter (the real
+    /// key flow — no ALPHA press needed).
+    public func handleVariableSelection(_ varName: Character) {
+        if waitingForSto {
+            waitingForSto = false
+            storeToVariable(varName)
+        } else if waitingForRcl {
+            waitingForRcl = false
+            recallVariable(varName)
+        } else {
+            if isMthIO {
+                insertASTText(String(varName))
+            } else {
+                insert(String(varName))
+            }
         }
     }
 
     // MARK: - Specialized Function Actions
 
     public func toggleSD() {
+        if isShowingDMS {
+            // S⇔D also clears the sexagesimal display back to decimal/exact
+            isShowingDMS = false
+        }
         if let exact = exactResult {
             isShowingDecimal.toggle()
             if isShowingDecimal {
-                result = CasioEvaluator.format(exact.toDouble(), format: displayFormat)
+                result = formatNumber(exact.toDouble())
             } else {
                 result = exact.toLinearString()
             }
@@ -2099,28 +2173,113 @@ public final class CalculatorEngine: ObservableObjectProtocol {
             displayFormat = .norm
         }
         if !isError, let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-            result = CasioEvaluator.format(val, format: displayFormat)
+            result = formatNumber(val)
         }
     }
 
-    public func cycleEng() {
-        displayFormat = (displayFormat == .eng) ? .norm : .eng
-        if !isError, let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
-            result = CasioEvaluator.format(val, format: displayFormat)
+    /// SHIFT + fraction key (d/c): apply the improper-fraction result format
+    /// command. Converts a mixed fraction result to its improper d/c form.
+    public func applyImproperFractionFormat() {
+        guard isShowingResult, !isError else { return }
+        fractionDisplay = .improper
+        if let exact = exactResult {
+            isShowingDecimal = false
+            result = exact.toLinearString()
+        } else if let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
+            result = CasioEvaluator.format(val, format: .fraction)
         }
+    }
+
+    /// SHIFT + S⇔D (a b/c ⇔ d/c): toggles the displayed fraction between
+    /// improper and mixed form (manual p.21).
+    public func toggleImproperMixed() {
+        guard isShowingResult, !isError else { return }
+        displayFormat = (displayFormat == .mixedFraction) ? .fraction : .mixedFraction
+        if let exact = exactResult, !isShowingDecimal, isMthIO {
+            // Exact 2D render picks up the mixed flag in the view; also refresh
+            // the linear fallback string
+            result = exact.toLinearString()
+        } else if let val = Double(result.replacingOccurrences(of: "×10^", with: "e")) {
+            result = formatNumber(val)
+        }
+    }
+
+    /// ° ' " on a displayed result: toggles decimal ⇔ sexagesimal display.
+    /// The underlying value (Ans) is never modified (manual p.23).
+    public func toggleResultDMS() {
+        guard isShowingResult, !isError, activeMode != .cmplx else { return }
+        isShowingDMS.toggle()
+        if isShowingDMS {
+            result = CasioEvaluator.formatSexagesimal(lastAnswer)
+        } else if let exact = exactResult, isMthIO, !isShowingDecimal {
+            result = exact.toLinearString()
+        } else {
+            result = formatNumber(lastAnswer)
+        }
+    }
+
+    /// ENG key: shifts the decimal point of the displayed result three places
+    /// (engineering notation); SHIFT+ENG (←) shifts back (manual p.24).
+    public func shiftEng(left: Bool) {
+        guard isShowingResult, !isError, lastAnswer != 0, lastAnswer.isFinite else { return }
+        if left {
+            engLevel = max(0, engLevel - 1)
+        } else {
+            engLevel += 1
+        }
+        result = CasioEvaluator.formatEng(lastAnswer, level: engLevel)
+    }
+
+    /// DRG▶ (SHIFT+Ans): converts the displayed result into the next angle unit
+    /// (Deg → Rad → Gra → Deg) without changing the calculator's angle unit.
+    public func convertResultAngleUnit() {
+        guard isShowingResult, !isError, lastAnswer.isFinite else { return }
+        let units: [AngleUnit] = [.deg, .rad, .gra]
+        guard let currentIdx = units.firstIndex(of: angleUnit) else { return }
+        drgCycle += 1
+        let target = units[(currentIdx + drgCycle) % 3]
+        let converted = target.fromRadians(angleUnit.toRadians(lastAnswer))
+        result = formatNumber(converted)
+    }
+
+    /// Rnd (SHIFT+0): rounds the displayed value to the display's digit capacity,
+    /// so subsequent calculations use exactly what is shown (manual p.24).
+    public func roundDisplayed() {
+        guard isShowingResult, !isError, lastAnswer.isFinite else { return }
+        let rounded: Double
+        switch displayFormat {
+        case .fix(let d):
+            let factor = Foundation.pow(10.0, Double(d))
+            rounded = (lastAnswer * factor).rounded() / factor
+        case .sci(let d):
+            let digits = max(1, d)
+            let exp = Foundation.floor(Foundation.log10(abs(lastAnswer)))
+            let factor = Foundation.pow(10.0, Double(digits - 1) - exp)
+            rounded = (lastAnswer * factor).rounded() / factor
+        default:
+            let factor = Foundation.pow(10.0, 9.0 - Foundation.floor(Foundation.log10(abs(lastAnswer))))
+            rounded = (lastAnswer * factor).rounded() / factor
+        }
+        lastAnswer = rounded
+        result = formatNumber(rounded)
+    }
+
+    /// SHIFT + 3 (BASE-N): enters BASE-N mode with decimal base. BASE-N always
+    /// uses Linear Display (reference §10).
+    public func enterBaseNMode() {
+        activeMode = .baseN
+        baseNType = .dec
+        isMthIO = false
     }
 
     public func primeFactorize() {
-        if let val = Double(result), val > 1, val <= 10000000000, val.rounded() == val {
+        let val = lastAnswer
+        if val > 1, val <= 10000000000, val.rounded() == val {
             if let fact = CasioEvaluator.primeFactorization(Int64(val)) {
+                isShowingDMS = false
+                exactResult = nil
                 result = fact
             }
-        }
-    }
-
-    public func convertToDMS() {
-        if let val = Double(result) {
-            result = CasioEvaluator.toDMS(val)
         }
     }
 
@@ -2131,149 +2290,20 @@ public final class CalculatorEngine: ObservableObjectProtocol {
     }
 
     public func applyConversion(code: Int) {
-        if let val = Double(result), let conv = CasioConversions.convert(value: val, code: code) {
-            result = CasioEvaluator.format(conv.result, format: displayFormat)
+        guard lastAnswer.isFinite else { return }
+        if let conv = CasioConversions.convert(value: lastAnswer, code: code) {
+            lastAnswer = conv.result
+            isShowingDMS = false
+            exactResult = nil
+            result = formatNumber(conv.result)
         }
     }
 
-    // MARK: - EQN Mode Helpers
+    // EQN helpers live in EquationMode.swift
 
-    public func startEqn(type: Int) {
-        eqnType = type
-        eqnCoeffs = []
-        eqnSolutions = []
-        eqnSolutionIndex = 0
-        let names = coeffNamesForEqn(type: type)
-        if let first = names.first {
-            menuState = .eqnCoeffPrompt(type: type, coeffName: first, coeffIndex: 0)
-        }
-    }
+    // MATRIX helpers live in MatrixMode.swift
 
-    public func coeffNamesForEqn(type: Int) -> [String] {
-        switch type {
-        case 1: return ["a1", "b1", "c1", "a2", "b2", "c2"]
-        case 2: return ["a1", "b1", "c1", "d1", "a2", "b2", "c2", "d2", "a3", "b3", "c3", "d3"]
-        case 3: return ["a", "b", "c"]
-        case 4: return ["a", "b", "c", "d"]
-        default: return []
-        }
-    }
-
-    public func advanceEqnCoeff(val: Double) {
-        eqnCoeffs.append(val)
-        let names = coeffNamesForEqn(type: eqnType)
-        if eqnCoeffs.count < names.count {
-            let nextIndex = eqnCoeffs.count
-            menuState = .eqnCoeffPrompt(type: eqnType, coeffName: names[nextIndex], coeffIndex: nextIndex)
-        } else {
-            // Solve!
-            switch eqnType {
-            case 1:
-                eqnSolutions = CasioEvaluator.solveSimultaneous2(
-                    a1: eqnCoeffs[0], b1: eqnCoeffs[1], c1: eqnCoeffs[2],
-                    a2: eqnCoeffs[3], b2: eqnCoeffs[4], c2: eqnCoeffs[5]
-                )
-            case 2:
-                eqnSolutions = CasioEvaluator.solveSimultaneous3(
-                    a1: eqnCoeffs[0], b1: eqnCoeffs[1], c1: eqnCoeffs[2], d1: eqnCoeffs[3],
-                    a2: eqnCoeffs[4], b2: eqnCoeffs[5], c2: eqnCoeffs[6], d2: eqnCoeffs[7],
-                    a3: eqnCoeffs[8], b3: eqnCoeffs[9], c3: eqnCoeffs[10], d3: eqnCoeffs[11]
-                )
-            case 3:
-                eqnSolutions = CasioEvaluator.solveQuadratic(
-                    a: eqnCoeffs[0], b: eqnCoeffs[1], c: eqnCoeffs[2]
-                )
-            case 4:
-                eqnSolutions = CasioEvaluator.solveCubic(
-                    a: eqnCoeffs[0], b: eqnCoeffs[1], c: eqnCoeffs[2], d: eqnCoeffs[3]
-                )
-            default: break
-            }
-            eqnSolutionIndex = 0
-            menuState = .eqnSolutionView(solutions: eqnSolutions, index: 0)
-        }
-    }
-
-    // MARK: - Table Mode Helpers
-
-    public func startTable() {
-        tableFormula = expression.isEmpty ? "X²" : expression
-        expression = tableFormula
-        menuState = .tablePrompt(step: 0)
-    }
-
-    public func advanceTablePrompt(val: Double? = nil) {
-        guard case .tablePrompt(let step) = menuState else { return }
-        switch step {
-        case 0:
-            tableFormula = expression.isEmpty ? "X²" : expression
-            menuState = .tablePrompt(step: 1)
-        case 1:
-            tableStartVal = val ?? tableStartVal
-            menuState = .tablePrompt(step: 2)
-        case 2:
-            tableEndVal = val ?? tableEndVal
-            menuState = .tablePrompt(step: 3)
-        case 3:
-            tableStepVal = val ?? tableStepVal
-            tableRows.removeAll()
-            var x = tableStartVal
-            let end = tableEndVal
-            let s = max(0.0001, tableStepVal)
-            while x <= end + 1e-9 && tableRows.count < 30 {
-                var vars = variables
-                vars["X"] = x
-                let res = CasioEvaluator.evaluate(tableFormula, angleUnit: angleUnit, variables: vars)
-                tableRows.append((x: x, fx: res.value ?? 0))
-                x += s
-            }
-            menuState = .tablePrompt(step: 4)
-        default:
-            menuState = .tablePrompt(step: 0)
-        }
-    }
-
-    // MARK: - CALC & SOLVE Helpers
-
-    public func startCalc() {
-        let varsInExpr = ["A", "B", "C", "D", "E", "F", "X", "Y"].filter { char in
-            expression.contains(char)
-        }.map { Character($0) }
-
-        if let first = varsInExpr.first {
-            menuState = .calcPrompt(varName: first, remainingVars: Array(varsInExpr.dropFirst()))
-        } else {
-            evaluate()
-        }
-    }
-
-    public func advanceCalc(val: Double) {
-        guard case .calcPrompt(let varName, let remaining) = menuState else { return }
-        variables[varName] = val
-        if let next = remaining.first {
-            menuState = .calcPrompt(varName: next, remainingVars: Array(remaining.dropFirst()))
-        } else {
-            menuState = .none
-            evaluate()
-        }
-    }
-
-    public func startSolve() {
-        let guess = variables["X"] ?? 0
-        menuState = .solvePrompt(initialGuess: guess)
-    }
-
-    public func executeSolve(guess: Double) {
-        if let res = CasioEvaluator.solveEquation(expression, initialGuess: guess, angleUnit: angleUnit, variables: variables) {
-            variables["X"] = res.root
-            lastAnswer = res.root
-            menuState = .solveResult(root: res.root, residual: res.residual)
-        } else {
-            isError = true
-            result = "Can't Solve"
-            menuState = .none
-        }
-    }
+    // TABLE helpers live in TableMode.swift
 
     private func openStatTypeMenu() {
         menuState = .statTypeMenu
